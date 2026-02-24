@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battle With Friend - Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <h1>Battle With Friend</h1>
+      <div class="user-info">
+        <span id="username-display"></span>
+        <button id="logout-btn" class="btn btn-secondary">Logout</button>
+      </div>
+    </header>
+    
+    <main class="dashboard-main">
+      <!-- Invitations Section -->
+      <section class="invitations-section">
+        <h2>Send Invitation</h2>
+        <form id="invite-form">
+          <div class="form-group">
+            <input type="text" id="invite-username" placeholder="Enter username" required>
+            <button type="submit" class="btn btn-primary">Send Invite</button>
+          </div>
+          <div id="invite-error" class="error-message"></div>
+          <div id="invite-success" class="success-message"></div>
+        </form>
+        
+        <h3>Active Invitations</h3>
+        <div id="invitations-container" class="invitations-list">
+          <p>Loading invitations...</p>
+        </div>
+      </section>
+      
+      <!-- Leaderboard Section -->
+      <section class="leaderboard-section">
+        <h2>Leaderboard</h2>
+        <div id="leaderboard-container">
+          <p>Loading leaderboard...</p>
+        </div>
+      </section>
+      
+      <!-- Match History Section -->
+      <section class="match-history-section">
+        <h2>Match History</h2>
+        <div id="match-history-container">
+          <p>Loading match history...</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
