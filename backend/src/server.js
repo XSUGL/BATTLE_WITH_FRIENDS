@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import matchesRoutes from './routes/matches.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { createGameServer } from './websocket/game-server.js'; // 👈 Il nostro nuovo motore di gioco!
 
 dotenv.config();
 
@@ -34,8 +35,13 @@ app.get('/health', (req, res) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+// Avvio del server normale (HTTP)
+const server = app.listen(PORT, () => {
   console.log(`✅ Server is running on port ${PORT}`);
 });
+
+// Avvio del server di gioco (WebSocket) agganciato a quello normale
+const wss = createGameServer(server);
+console.log('✅ WebSocket game server is running');
 
 export default app;

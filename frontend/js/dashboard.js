@@ -71,57 +71,93 @@ inviteForm.addEventListener('submit', async (e) => {
     setTimeout(() => {
       inviteSuccess.classList.remove('show');
     }, 3000);
+    
+    // Ricarica la lista subito dopo aver inviato
+    loadInvitations();
   } catch (error) {
     inviteError.textContent = error.message;
     inviteError.classList.add('show');
   }
 });
 
+// ==========================================
+// 🔴 LA BOMBA NUCLEARE PER IL BOTTONE FANTASMA
+// ==========================================
+// Ascoltiamo i click su TUTTO il documento, ovunque sia il pop-up!
+document.addEventListener('click', async (e) => {
+  // Controlla se abbiamo cliccato un elemento con la classe 'accept-btn'
+  const acceptBtn = e.target.closest('.accept-btn');
+  
+  if (acceptBtn) {
+    const invitationId = acceptBtn.dataset.id;
+    try {
+      // Blocca il bottone per evitare doppi click
+      acceptBtn.disabled = true;
+      acceptBtn.textContent = 'Connecting...';
+      
+      // Accetta l'invito nel backend
+      const result = await acceptInvitation(invitationId);
+      
+      // 🚀 BOOM! TI PORTA AL GIOCO! 🚀
+      window.location.href = `/game.html?matchId=${result.match.id}`;
+      
+    } catch (error) {
+      alert('Failed to accept invitation: ' + error.message);
+      acceptBtn.disabled = false;
+      acceptBtn.textContent = 'Accept';
+    }
+  }
+});
+
 // Load active invitations
 async function loadInvitations() {
   try {
-    showInvitationsLoading(invitationsContainer);
+    // Evita l'effetto "lampeggio" ogni 10 secondi
+    if (invitationsContainer && invitationsContainer.innerHTML === '') {
+      showInvitationsLoading(invitationsContainer);
+    }
     const invitations = await getActiveInvitations();
-    renderInvitations(invitationsContainer, invitations);
-    
-    // Add event listeners to accept buttons
-    const acceptButtons = document.querySelectorAll('.accept-btn');
-    acceptButtons.forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const invitationId = btn.dataset.id;
-        try {
-          await acceptInvitation(invitationId);
-          alert('Invitation accepted! Match created.');
-          loadInvitations();
-        } catch (error) {
-          alert('Failed to accept invitation: ' + error.message);
-        }
-      });
-    });
+    if (invitationsContainer) {
+      renderInvitations(invitationsContainer, invitations);
+    }
   } catch (error) {
-    showInvitationsError(invitationsContainer, error.message);
+    if (invitationsContainer) {
+      showInvitationsError(invitationsContainer, error.message);
+    }
   }
 }
 
 // Load leaderboard
 async function loadLeaderboard() {
   try {
-    showLeaderboardLoading(leaderboardContainer);
+    if (leaderboardContainer && leaderboardContainer.innerHTML === '') {
+      showLeaderboardLoading(leaderboardContainer);
+    }
     const leaderboard = await getLeaderboard();
-    renderLeaderboard(leaderboardContainer, leaderboard, user.id);
+    if (leaderboardContainer) {
+      renderLeaderboard(leaderboardContainer, leaderboard, user.id);
+    }
   } catch (error) {
-    showLeaderboardError(leaderboardContainer, error.message);
+    if (leaderboardContainer) {
+      showLeaderboardError(leaderboardContainer, error.message);
+    }
   }
 }
 
 // Load match history
 async function loadMatchHistory() {
   try {
-    showMatchHistoryLoading(matchHistoryContainer);
+    if (matchHistoryContainer && matchHistoryContainer.innerHTML === '') {
+      showMatchHistoryLoading(matchHistoryContainer);
+    }
     const history = await getMatchHistory();
-    renderMatchHistory(matchHistoryContainer, history);
+    if (matchHistoryContainer) {
+      renderMatchHistory(matchHistoryContainer, history);
+    }
   } catch (error) {
-    showMatchHistoryError(matchHistoryContainer, error.message);
+    if (matchHistoryContainer) {
+      showMatchHistoryError(matchHistoryContainer, error.message);
+    }
   }
 }
 
