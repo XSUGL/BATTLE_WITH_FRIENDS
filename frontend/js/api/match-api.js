@@ -1,4 +1,4 @@
-import { getToken } from './auth-api.js';
+import { getToken, logout } from './auth-api.js';
 
 const API_BASE_URL = window.API_BASE_URL || 'http://localhost:3000/api';
 
@@ -19,7 +19,8 @@ async function fetchWithAuth(url, options = {}) {
   });
   
   if (response.status === 401) {
-    // Token expired or invalid
+    // Token expired or invalid - clear storage before redirecting
+    logout();
     window.location.href = '/index.html';
     throw new Error('Authentication required');
   }
@@ -82,6 +83,21 @@ export async function getMatchHistory() {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error?.message || 'Failed to fetch match history');
+  }
+  
+  return await response.json();
+}
+
+export async function getActiveMatch() {
+  const response = await fetchWithAuth(`${API_BASE_URL}/matches/active`);
+  
+  if (response.status === 404) {
+    return null;
+  }
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to fetch active match');
   }
   
   return await response.json();

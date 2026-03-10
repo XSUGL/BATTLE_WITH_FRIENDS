@@ -17,7 +17,13 @@ export async function updateMatchStatus(matchId, status, winnerId = null, conn =
   const connection = conn || await pool.getConnection();
   const shouldRelease = !conn;
   try {
-    if (winnerId !== null) {
+    if (status === 'active') {
+      // When a match becomes active, record activation timestamp.
+      await connection.execute(
+        'UPDATE matches SET status = ?, activated_at = NOW() WHERE id = ?',
+        [status, matchId]
+      );
+    } else if (winnerId !== null) {
       await connection.execute(
         'UPDATE matches SET status = ?, winner_id = ? WHERE id = ?',
         [status, winnerId, matchId]
@@ -66,16 +72,16 @@ export async function getMatchHistory(userId, limit = 50, conn = null) {
       if (row.status === 'cancelled') resultStatus = 'cancelled';
       else if (row.winner_id === userId) resultStatus = 'win';
 
+      const isCancelled = row.status === 'cancelled';
+
       return {
         id: row.id,
-        status: row.status,
         result: resultStatus,
-        // FIX APPLICATO QUI
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
         opponentId: row.opponent_id,
         opponentUsername: row.opponent_username,
-        myScoreChange: row.my_score_change || 0,
-        opponentScoreChange: row.opponent_score_change || 0
+        myScore: isCancelled ? null : (row.my_score_change ?? null),
+        opponentScore: isCancelled ? null : (row.opponent_score_change ?? null)
       };
     });
   } finally {
@@ -88,14 +94,43 @@ export async function createMatch(invitationId, player1Id, player2Id, conn = nul
   const shouldRelease = !conn;
   try {
     const [result] = await connection.execute(
-      'INSERT INTO matches (player1_id, player2_id, status) VALUES (?, ?, "active")',
+      'INSERT INTO matches (player1_id, player2_id, status) VALUES (?, ?, "pending")',
       [player1Id, player2Id]
     );
     return {
       id: Number(result.insertId),
       player1Id,
       player2Id,
-      status: 'active'
+      status: 'pending'
+    };
+  } finally {
+    if (shouldRelease) connection.release();
+  }
+}
+
+export async function findActiveMatchForUser(userId, conn = null) {
+  const connection = conn || await pool.getConnection();
+  const shouldRelease = !conn;
+  try {
+    const [result] = await connection.execute(
+      `SELECT id, player1_id, player2_id, status, winner_id, created_at, activated_at
+       FROM matches
+       WHERE status = 'active' AND (player1_id = ? OR player2_id = ?)
+       ORDER BY activated_at DESC, created_at DESC
+       LIMIT 1`,
+      [userId, userId]
+    );
+    const rows = (Array.isArray(result) && Array.isArray(result[0])) ? result[0] : result;
+    if (!rows || rows.length === 0) return null;
+    const row = rows[0];
+    return {
+      id: row.id,
+      player1Id: row.player1_id,
+      player2Id: row.player2_id,
+      status: row.status,
+      winnerId: row.winner_id ?? null,
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+      activatedAt: row.activated_at ? new Date(row.activated_at).toISOString() : null
     };
   } finally {
     if (shouldRelease) connection.release();

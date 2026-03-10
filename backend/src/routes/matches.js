@@ -7,7 +7,7 @@ import {
   findActiveInvitationsByInvitee,
   acceptInvitation
 } from '../models/invitation-model.js';
-import { getMatchHistory, completeMatch } from '../models/match-model.js';
+import { getMatchHistory, completeMatch, findActiveMatchForUser } from '../models/match-model.js';
 import { saveMatchResults } from '../models/score-model.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
 import pool from '../utils/db.js';
@@ -85,9 +85,8 @@ router.post(
         throw new ValidationError('Invalid invitation ID');
       }
       
-      const result = await acceptInvitation(invitationId, inviteeId);
-      
-      res.status(200).json(result);
+      const match = await acceptInvitation(invitationId, inviteeId);
+      res.status(200).json(match);
     } catch (error) {
       if (error.message === 'Invitation not found') {
         return next(new NotFoundError('Invitation not found'));
@@ -97,6 +96,24 @@ router.post(
           error.message === 'You are not the recipient of this invitation') {
         return next(new ValidationError(error.message));
       }
+      next(error);
+    }
+  }
+);
+
+// Get active match for current user
+router.get(
+  '/active',
+  authenticate,
+  async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const match = await findActiveMatchForUser(userId);
+      if (!match) {
+        throw new NotFoundError('No active match found');
+      }
+      return res.status(200).json(match);
+    } catch (error) {
       next(error);
     }
   }

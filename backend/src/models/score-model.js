@@ -76,8 +76,7 @@ export async function getLeaderboard(currentUserId) {
         rank: currentRank,
         userId: rows[i].user_id,
         username: rows[i].username,
-        score: score,
-        isCurrentUser: rows[i].user_id === currentUserId
+        totalScore: score
       });
 
       previousScore = score;

@@ -1,5 +1,7 @@
 import { GameState } from '../game/game-state.js';
-import { updateMatchStatus, saveMatchResults } from '../utils/match-manager.js';
+import pool from '../utils/db.js';
+import { updateMatchStatus, completeMatch } from '../models/match-model.js';
+import { saveMatchResults } from '../models/score-model.js';
 
 export class GameRoom {
   constructor(matchId) {
@@ -90,9 +92,19 @@ export class GameRoom {
     const winnerId = winnerNumber === 1 ? this.player1.userId : this.player2.userId;
     const loserId = winnerNumber === 1 ? this.player2.userId : this.player1.userId;
     
-    // Salva risultati nel database
-    await updateMatchStatus(this.matchId, 'completed', winnerId);
-    await saveMatchResults(this.matchId, winnerId, loserId);
+    // Salva risultati nel database (atomic)
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await completeMatch(this.matchId, winnerId, conn);
+      await saveMatchResults(this.matchId, winnerId, loserId, conn);
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
     
     // Notifica i client
     this.broadcast({

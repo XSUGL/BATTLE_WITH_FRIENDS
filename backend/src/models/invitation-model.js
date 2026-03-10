@@ -139,21 +139,18 @@ export async function acceptInvitation(invitationId, inviteeId) {
       
       // Crea la partita
       const [matchResult] = await conn.execute(
-        'INSERT INTO matches (player1_id, player2_id, status) VALUES (?, ?, "active")',
+        'INSERT INTO matches (player1_id, player2_id, status) VALUES (?, ?, "pending")',
         [invitation.inviterId, invitation.inviteeId]
       );
       
       await conn.commit();
       
-      invitation.status = 'accepted';
       return {
-        invitation,
-        match: {
-          id: Number(matchResult.insertId),
-          player1Id: invitation.inviterId,
-          player2Id: invitation.inviteeId,
-          status: 'active'
-        }
+        id: Number(matchResult.insertId),
+        player1Id: invitation.inviterId,
+        player2Id: invitation.inviteeId,
+        status: 'pending',
+        createdAt: new Date().toISOString()
       };
     } catch (error) {
       await conn.rollback();

@@ -99,7 +99,7 @@ document.addEventListener('click', async (e) => {
       const result = await acceptInvitation(invitationId);
       
       // 🚀 BOOM! TI PORTA AL GIOCO! 🚀
-      window.location.href = `/game.html?matchId=${result.match.id}`;
+      window.location.href = `/game.html?matchId=${result.id}`;
       
     } catch (error) {
       alert('Failed to accept invitation: ' + error.message);

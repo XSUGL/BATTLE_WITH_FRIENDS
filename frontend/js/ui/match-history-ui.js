@@ -63,8 +63,11 @@ function formatScore(myScore, opponentScore, result) {
     return '<span class="negative">-</span>';
   }
   
-  const myScoreClass = myScore > 0 ? 'positive' : 'negative';
-  const opponentScoreClass = opponentScore > 0 ? 'positive' : 'negative';
+  const safeMyScore = (typeof myScore === 'number') ? myScore : 0;
+  const safeOpponentScore = (typeof opponentScore === 'number') ? opponentScore : 0;
+
+  const myScoreClass = safeMyScore > 0 ? 'positive' : 'negative';
+  const opponentScoreClass = safeOpponentScore > 0 ? 'positive' : 'negative';
   
-  return `<span class="${myScoreClass}">${myScore > 0 ? '+' : ''}${myScore}</span> / <span class="${opponentScoreClass}">${opponentScore > 0 ? '+' : ''}${opponentScore}</span>`;
+  return `<span class="${myScoreClass}">${safeMyScore > 0 ? '+' : ''}${safeMyScore}</span> / <span class="${opponentScoreClass}">${safeOpponentScore > 0 ? '+' : ''}${safeOpponentScore}</span>`;
 }
