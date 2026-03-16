@@ -1,0 +1,94 @@
+.maps-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.map-card {
+  background: #0e1520;
+  border: 2px solid #1e2d45;
+  border-radius: 16px;
+  padding: 20px 16px;
+  width: 180px;
+  min-height: 140px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.map-card:hover {
+  border-color: #00c8ff;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 28px rgba(0,200,255,0.18);
+}
+
+.map-card.voted {
+  border-color: #00c8ff;
+  background: rgba(0,200,255,0.07);
+  box-shadow: 0 0 26px rgba(0,200,255,0.22);
+}
+
+.map-card.decided {
+  border-color: #ffd700;
+  background: rgba(255,215,0,0.08);
+  box-shadow: 0 0 32px rgba(255,215,0,0.28);
+}
+
+.map-check {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #00c8ff;
+  display: none;
+}
+
+.map-card.voted .map-check { display: block; }
+.map-card.decided .map-check { display: block; color: #ffd700; }
+
+.map-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.map-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 5px;
+}
+
+.map-desc {
+  font-size: 10px;
+  color: #445566;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.map-votes {
+  font-size: 18px;
+  min-height: 24px;
+  letter-spacing: 3px;
+}
+
+.map-decided {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  color: #ffd700;
+  letter-spacing: 3px;
+  min-height: 28px;
+  margin-top: 8px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 16px rgba(255,215,0,0.5);
+}

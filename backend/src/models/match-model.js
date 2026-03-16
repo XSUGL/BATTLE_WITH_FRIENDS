@@ -18,7 +18,6 @@ export async function updateMatchStatus(matchId, status, winnerId = null, conn =
   const shouldRelease = !conn;
   try {
     if (status === 'active') {
-      // When a match becomes active, record activation timestamp.
       await connection.execute(
         'UPDATE matches SET status = ?, activated_at = NOW() WHERE id = ?',
         [status, matchId]
@@ -108,6 +107,8 @@ export async function createMatch(invitationId, player1Id, player2Id, conn = nul
   }
 }
 
+// FIX: cerca sia 'pending' che 'active' così Player 1 viene rediretto
+// subito quando Player 2 accetta (match parte come pending)
 export async function findActiveMatchForUser(userId, conn = null) {
   const connection = conn || await pool.getConnection();
   const shouldRelease = !conn;
@@ -115,8 +116,9 @@ export async function findActiveMatchForUser(userId, conn = null) {
     const [result] = await connection.execute(
       `SELECT id, player1_id, player2_id, status, winner_id, created_at, activated_at
        FROM matches
-       WHERE status = 'active' AND (player1_id = ? OR player2_id = ?)
-       ORDER BY activated_at DESC, created_at DESC
+       WHERE status IN ('pending', 'active')
+         AND (player1_id = ? OR player2_id = ?)
+       ORDER BY created_at DESC
        LIMIT 1`,
       [userId, userId]
     );

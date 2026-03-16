@@ -14,7 +14,7 @@ import pool from '../utils/db.js';
 
 const router = express.Router();
 
-// Create invitation
+// ── Create invitation ──
 router.post(
   '/invite',
   authenticate,
@@ -35,20 +35,16 @@ router.post(
       const { username } = req.body;
       const inviterId = req.user.id;
       
-      // Find invitee
       const invitee = await findUserByUsername(username);
       if (!invitee) {
         throw new NotFoundError('User not found');
       }
       
-      // Check if inviting self
       if (invitee.id === inviterId) {
         throw new ValidationError('You cannot invite yourself');
       }
       
-      // Create invitation
       const invitation = await createInvitation(inviterId, invitee.id);
-      
       res.status(201).json(invitation);
     } catch (error) {
       next(error);
@@ -56,7 +52,7 @@ router.post(
   }
 );
 
-// Get active invitations
+// ── Get active invitations (chi riceve) ──
 router.get(
   '/invites/active',
   authenticate,
@@ -64,7 +60,6 @@ router.get(
     try {
       const inviteeId = req.user.id;
       const invitations = await findActiveInvitationsByInvitee(inviteeId);
-      
       res.status(200).json(invitations);
     } catch (error) {
       next(error);
@@ -72,7 +67,7 @@ router.get(
   }
 );
 
-// Accept invitation
+// ── Accept invitation ──
 router.post(
   '/invites/:id/accept',
   authenticate,
@@ -101,7 +96,10 @@ router.post(
   }
 );
 
-// Get active match for current user
+// ── GET /api/matches/active — polling Player 1 (invitante) ──
+// Ritorna il match pending/active dell'utente loggato se esiste.
+// Player 1 fa polling ogni 2s sul dashboard: appena Player 2 accetta
+// (match diventa 'pending'), Player 1 viene rediretto al gioco.
 router.get(
   '/active',
   authenticate,
@@ -110,7 +108,9 @@ router.get(
       const userId = req.user.id;
       const match = await findActiveMatchForUser(userId);
       if (!match) {
-        throw new NotFoundError('No active match found');
+        return res.status(404).json({
+          error: { message: 'No active match found', code: 'NOT_FOUND', status: 404 }
+        });
       }
       return res.status(200).json(match);
     } catch (error) {
@@ -119,7 +119,7 @@ router.get(
   }
 );
 
-// Get match history
+// ── Get match history ──
 router.get(
   '/history',
   authenticate,
@@ -127,7 +127,6 @@ router.get(
     try {
       const userId = req.user.id;
       const history = await getMatchHistory(userId, 50);
-      
       res.status(200).json(history);
     } catch (error) {
       next(error);
@@ -135,7 +134,7 @@ router.get(
   }
 );
 
-// Forfeit match
+// ── Forfeit match ──
 router.post(
   '/:id/forfeit',
   authenticate,
@@ -153,16 +152,16 @@ router.post(
       try {
         await conn.beginTransaction();
         
-        const match = await conn.query(
+        const [rows] = await conn.execute(
           'SELECT * FROM matches WHERE id = ?',
           [matchId]
         );
-        
-        if (match.length === 0) {
+
+        if (!rows || rows.length === 0) {
           throw new NotFoundError('Match not found');
         }
         
-        const matchData = match[0];
+        const matchData = rows[0];
         
         if (matchData.player1_id !== userId && matchData.player2_id !== userId) {
           throw new ValidationError('You are not a player in this match');
@@ -172,14 +171,10 @@ router.post(
           throw new ValidationError('Match is not active');
         }
         
-        // Determine winner (opponent)
         const winnerId = matchData.player1_id === userId ? matchData.player2_id : matchData.player1_id;
         const loserId = userId;
         
-        // Complete match
         await completeMatch(matchId, winnerId, conn);
-        
-        // Save scores
         await saveMatchResults(matchId, winnerId, loserId, conn);
         
         await conn.commit();

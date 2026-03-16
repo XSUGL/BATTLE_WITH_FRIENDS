@@ -66,6 +66,22 @@ export async function acceptInvitation(invitationId) {
   return await response.json();
 }
 
+// FIX: aggiunta funzione per il polling del player 1 (invitante)
+export async function getActiveMatch() {
+  const response = await fetchWithAuth(`${API_BASE_URL}/matches/active`);
+  
+  if (response.status === 404) {
+    return null;
+  }
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to fetch active match');
+  }
+  
+  return await response.json();
+}
+
 export async function getLeaderboard() {
   const response = await fetchWithAuth(`${API_BASE_URL}/leaderboard`);
   
@@ -83,21 +99,6 @@ export async function getMatchHistory() {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error?.message || 'Failed to fetch match history');
-  }
-  
-  return await response.json();
-}
-
-export async function getActiveMatch() {
-  const response = await fetchWithAuth(`${API_BASE_URL}/matches/active`);
-  
-  if (response.status === 404) {
-    return null;
-  }
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Failed to fetch active match');
   }
   
   return await response.json();

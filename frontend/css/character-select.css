@@ -1,0 +1,292 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #080c14;
+  --surface: #0e1520;
+  --surface2: #151e2e;
+  --border: #1e2d45;
+  --gold: #ffd700;
+  --p1: #00c8ff;
+  --p2: #ff4060;
+  --text: #c8d8f0;
+}
+
+body {
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(0,200,255,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(255,64,96,0.05) 0%, transparent 60%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  color: var(--text);
+}
+
+.cs-wrapper {
+  width: 100%;
+  max-width: 960px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.cs-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(255,215,0,0.4);
+  margin-bottom: 8px;
+}
+
+.cs-sub {
+  font-size: 14px;
+  color: #445;
+  letter-spacing: 2px;
+  margin-bottom: 28px;
+  min-height: 20px;
+}
+
+.section-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: #334;
+  margin-bottom: 14px;
+  text-align: left;
+  padding-left: 4px;
+}
+
+/* ── Classi ── */
+.classes-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.class-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 20px;
+  width: 156px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.class-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+  pointer-events: none;
+}
+
+.class-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(255,215,0,0.15);
+}
+
+.class-card.selected {
+  border-color: var(--gold);
+  background: rgba(255,215,0,0.07);
+  box-shadow: 0 0 30px rgba(255,215,0,0.25);
+}
+
+.class-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 8px; right: 12px;
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.class-icon { font-size: 40px; margin-bottom: 10px; display: block; }
+
+.class-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 14px;
+}
+
+.class-stats { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+.stat { display: flex; align-items: center; gap: 6px; }
+
+.stat-label {
+  font-size: 9px;
+  color: #445;
+  letter-spacing: 1px;
+  width: 28px;
+  text-align: left;
+  font-family: 'Orbitron', monospace;
+}
+
+.stat-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.stat-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--p1), var(--gold));
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.stat-val {
+  font-size: 9px;
+  color: var(--text);
+  width: 28px;
+  text-align: right;
+  font-family: 'Orbitron', monospace;
+}
+
+.class-weapon { font-size: 11px; color: #556; margin-top: 4px; }
+
+/* ── Mappe ── */
+.maps-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.map-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 16px;
+  width: 180px;
+  min-height: 140px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.map-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+  pointer-events: none;
+}
+
+.map-card:hover {
+  border-color: var(--p1);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 28px rgba(0,200,255,0.18);
+}
+
+.map-card.voted {
+  border-color: var(--p1);
+  background: rgba(0,200,255,0.07);
+  box-shadow: 0 0 26px rgba(0,200,255,0.22);
+}
+
+.map-card.voted::after {
+  content: '✓';
+  position: absolute;
+  top: 8px; right: 12px;
+  color: var(--p1);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.map-card.decided {
+  border-color: var(--gold);
+  background: rgba(255,215,0,0.08);
+  box-shadow: 0 0 32px rgba(255,215,0,0.28);
+}
+
+.map-card.decided::after {
+  content: '★';
+  position: absolute;
+  top: 8px; right: 12px;
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.map-icon { font-size: 32px; margin-bottom: 8px; display: block; }
+
+.map-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 5px;
+}
+
+.map-desc {
+  font-size: 10px;
+  color: #445;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.map-votes { font-size: 18px; min-height: 24px; letter-spacing: 3px; }
+
+/* ── Mappa decisa ── */
+.map-decided {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 3px;
+  min-height: 28px;
+  margin-top: 8px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 16px rgba(255,215,0,0.5);
+}
+
+/* ── Actions ── */
+.cs-actions { margin-bottom: 20px; }
+
+.btn-ready {
+  padding: 14px 60px;
+  background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05));
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'Orbitron', monospace;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  transition: all 0.2s;
+}
+
+.btn-ready:not(:disabled):hover {
+  background: rgba(255,215,0,0.2);
+  box-shadow: 0 0 30px rgba(255,215,0,0.3);
+  transform: scale(1.04);
+}
+
+.btn-ready:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.opponent-status { font-size: 13px; color: #445; letter-spacing: 1px; min-height: 20px; }
