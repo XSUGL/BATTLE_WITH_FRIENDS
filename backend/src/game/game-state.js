@@ -46,6 +46,11 @@ export const MAPS = {
     hasGround: true,
     groundY: 460,
     platforms: [],
+    obstacles: [
+      { x: 340, y: 320, w: 120, h: 24, type: 'wall' },
+      { x: 160, y: 390, w: 80,  h: 20, type: 'wall' },
+      { x: 560, y: 390, w: 80,  h: 20, type: 'wall' }
+    ],
     hazards: [],
     bgColor: '#070b11',
     groundColor: 'rgba(0,200,255,0.4)',
@@ -64,6 +69,11 @@ export const MAPS = {
       { x: 160, y: 180, w: 120, h: 14 },
       { x: 520, y: 180, w: 120, h: 14 }
     ],
+    obstacles: [
+      { x: 350, y: 370, w: 100, h: 18, type: 'wall' },
+      { x: 0,   y: 220, w: 50,  h: 18, type: 'wall' },
+      { x: 750, y: 220, w: 50,  h: 18, type: 'wall' }
+    ],
     hazards: [],
     bgColor: '#0a0e18',
     groundColor: 'rgba(100,200,100,0.6)',
@@ -75,7 +85,16 @@ export const MAPS = {
     restitution: 0.85,
     hasGround: false,
     groundY: 500,
-    platforms: [],
+    platforms: [
+      { x: 100, y: 150, w: 160, h: 12 },
+      { x: 540, y: 150, w: 160, h: 12 },
+      { x: 300, y: 350, w: 200, h: 12 }
+    ],
+    obstacles: [
+      { x: 340, y: 60,  w: 120, h: 20, type: 'asteroid' },
+      { x: 100, y: 300, w: 70,  h: 20, type: 'asteroid' },
+      { x: 630, y: 300, w: 70,  h: 20, type: 'asteroid' }
+    ],
     hazards: [],
     bgColor: '#02020f',
     groundColor: 'rgba(100,100,255,0.2)',
@@ -92,11 +111,24 @@ export const MAPS = {
       { x: 620, y: 300, w: 120, h: 14 },
       { x: 290, y: 220, w: 220, h: 14 }
     ],
+    obstacles: [
+      { x: 200, y: 380, w: 60, h: 20, type: 'rock' },
+      { x: 540, y: 380, w: 60, h: 20, type: 'rock' },
+      { x: 370, y: 140, w: 60, h: 20, type: 'rock' }
+    ],
     hazards: [{ type: 'lava', y: 460, rising: true }],
     bgColor: '#110500',
     groundColor: 'rgba(255,80,0,0.7)',
     ambientColor: 'rgba(255,80,0,0.08)'
   }
+};
+
+// ── Power-up types ──
+export const POWERUP_TYPES = {
+  weapon_grow:   { icon: '⚡', color: '#ffd700', label: '+SIZE',   duration: 8000 },
+  damage_boost:  { icon: '🔥', color: '#ff4444', label: '+DMG',    duration: 8000 },
+  speed_boost:   { icon: '💨', color: '#00ffaa', label: '+SPEED',  duration: 6000 },
+  shield:        { icon: '🛡️',  color: '#4488ff', label: 'SHIELD',  duration: 6000 }
 };
 
 export class GameState {
@@ -127,6 +159,13 @@ export class GameState {
     this.lastHitTime  = { p1: 0, p2: 0 };
     this.particles    = [];
     this.tick         = 0;
+
+    // Power-ups
+    this.powerups          = [];
+    this.lastPowerupSpawn  = 0;
+    this.powerupInterval   = 7000;
+    this.effects           = { p1: {}, p2: {} };
+    this.baseWeaponSize    = { p1: null, p2: null }; // saved on first pickup
   }
 
   createPlayer(num, cls, x, y) {
@@ -160,13 +199,24 @@ export class GameState {
     this.checkBallCollision();
     this.updateLava();
     this.updateParticles();
+    this.updatePowerups();
   }
 
   updatePlayer(p, input) {
     if (p.dead) return;
 
-    if (input.left)  p.vx -= p.speed * 0.18;
-    if (input.right) p.vx += p.speed * 0.18;
+    const pkey = p.num === 1 ? 'p1' : 'p2';
+    const eff  = this.effects[pkey];
+    const now  = Date.now();
+
+    // Clean expired effects
+    for (const [type, exp] of Object.entries(eff)) { if (now > exp) delete eff[type]; }
+
+    const speedMult = eff.speed_boost ? 1.55 : 1;
+    const effectiveSpeed = p.speed * speedMult;
+
+    if (input.left)  p.vx -= effectiveSpeed * 0.18;
+    if (input.right) p.vx += effectiveSpeed * 0.18;
     if (input.up && p.onGround) {
       p.vy = this.mapId === 'space' ? -6 : -10.5;
       p.onGround = false;
@@ -184,6 +234,34 @@ export class GameState {
           p.y = plat.y - p.radius;
           p.vy = p.vy > 1 ? -Math.abs(p.vy) * this.restitution * 0.4 : 0;
           p.onGround = true;
+        }
+      }
+    }
+
+    // Collisione ostacoli (top + sides)
+    for (const obs of (this.map.obstacles || [])) {
+      const overlapX = p.x + p.radius > obs.x && p.x - p.radius < obs.x + obs.w;
+      const overlapY = p.y + p.radius > obs.y && p.y - p.radius < obs.y + obs.h;
+      if (overlapX && overlapY) {
+        // Determine shallowest axis
+        const fromLeft   = (p.x + p.radius) - obs.x;
+        const fromRight  = (obs.x + obs.w)  - (p.x - p.radius);
+        const fromTop    = (p.y + p.radius) - obs.y;
+        const fromBottom = (obs.y + obs.h)  - (p.y - p.radius);
+        const minX = Math.min(fromLeft, fromRight);
+        const minY = Math.min(fromTop, fromBottom);
+        if (minY < minX) {
+          if (fromTop < fromBottom) {
+            p.y = obs.y - p.radius;
+            p.vy = p.vy > 1 ? -Math.abs(p.vy) * this.restitution * 0.4 : 0;
+            p.onGround = true;
+          } else {
+            p.y = obs.y + obs.h + p.radius;
+            p.vy = Math.abs(p.vy) * 0.3;
+          }
+        } else {
+          if (fromLeft < fromRight) { p.x = obs.x - p.radius; p.vx = -Math.abs(p.vx) * this.restitution; }
+          else                      { p.x = obs.x + obs.w + p.radius; p.vx = Math.abs(p.vx) * this.restitution; }
         }
       }
     }
@@ -213,10 +291,10 @@ export class GameState {
 
     // Lava
     if (this.lavaRising && p.y + p.radius >= this.lavaY) {
-      const now = Date.now();
-      if (now - this.lastHitTime[p.num === 1 ? 'p1' : 'p2'] > 400) {
+      const dmgNow = Date.now();
+      if (dmgNow - this.lastHitTime[pkey] > 400) {
         this.applyDamage(p, 8, { x: p.x, y: p.y });
-        this.lastHitTime[p.num === 1 ? 'p1' : 'p2'] = now;
+        this.lastHitTime[pkey] = dmgNow;
       }
       p.y  = this.lavaY - p.radius;
       p.vy = -Math.abs(p.vy) * 0.3 - 4;
@@ -243,26 +321,83 @@ export class GameState {
 
   checkWeaponCollisions() {
     const now = Date.now();
+    const dmgMult1 = this.effects.p1.damage_boost ? 2.2 : 1;
+    const dmgMult2 = this.effects.p2.damage_boost ? 2.2 : 1;
+    const shield1  = !!this.effects.p1.shield;
+    const shield2  = !!this.effects.p2.shield;
+
     for (const w of this.player1.weapons) {
       const tip  = this.getWeaponTipPosition(this.player1, w);
       const dist = Math.hypot(tip.x - this.player2.x, tip.y - this.player2.y);
-      if (dist < this.player2.radius + w.width / 2 && now - this.lastHitTime.p2 > this.hitCooldown) {
-        this.applyDamage(this.player2, w.damage, tip);
-        this.lastHitTime.p2 = now;
-        const angle = Math.atan2(this.player2.y - this.player1.y, this.player2.x - this.player1.x);
-        this.player2.vx += Math.cos(angle) * 5;
-        this.player2.vy += Math.sin(angle) * 4 - 2;
+      const hitRadius = this.player2.radius + (this.effects.p1.weapon_grow ? w.width : w.width / 2);
+      if (dist < hitRadius && now - this.lastHitTime.p2 > this.hitCooldown) {
+        if (!shield2) {
+          this.applyDamage(this.player2, w.damage * dmgMult1, tip);
+          this.lastHitTime.p2 = now;
+          const angle = Math.atan2(this.player2.y - this.player1.y, this.player2.x - this.player1.x);
+          this.player2.vx += Math.cos(angle) * 5;
+          this.player2.vy += Math.sin(angle) * 4 - 2;
+        }
       }
     }
     for (const w of this.player2.weapons) {
       const tip  = this.getWeaponTipPosition(this.player2, w);
       const dist = Math.hypot(tip.x - this.player1.x, tip.y - this.player1.y);
-      if (dist < this.player1.radius + w.width / 2 && now - this.lastHitTime.p1 > this.hitCooldown) {
-        this.applyDamage(this.player1, w.damage, tip);
-        this.lastHitTime.p1 = now;
-        const angle = Math.atan2(this.player1.y - this.player2.y, this.player1.x - this.player2.x);
-        this.player1.vx += Math.cos(angle) * 5;
-        this.player1.vy += Math.sin(angle) * 4 - 2;
+      const hitRadius = this.player1.radius + (this.effects.p2.weapon_grow ? w.width : w.width / 2);
+      if (dist < hitRadius && now - this.lastHitTime.p1 > this.hitCooldown) {
+        if (!shield1) {
+          this.applyDamage(this.player1, w.damage * dmgMult2, tip);
+          this.lastHitTime.p1 = now;
+          const angle = Math.atan2(this.player1.y - this.player2.y, this.player1.x - this.player2.x);
+          this.player1.vx += Math.cos(angle) * 5;
+          this.player1.vy += Math.sin(angle) * 4 - 2;
+        }
+      }
+    }
+  }
+
+  // ── Power-ups ──
+  updatePowerups() {
+    const now = Date.now();
+    // Spawn
+    if (now - this.lastPowerupSpawn > this.powerupInterval && this.powerups.length < 3) {
+      const types = ['weapon_grow', 'damage_boost', 'speed_boost', 'shield'];
+      const type  = types[Math.floor(Math.random() * types.length)];
+      const margin = 60;
+      const x = margin + Math.random() * (this.arenaWidth - margin * 2);
+      // Spawn sopra il suolo (o al centro in space)
+      const y = this.map.hasGround
+        ? this.groundY - 60 - Math.random() * 200
+        : 80 + Math.random() * (this.arenaHeight - 160);
+      this.powerups.push({ id: now, type, x, y, radius: 18, born: now });
+      this.lastPowerupSpawn = now;
+    }
+
+    // Remove expired powerups (30s lifetime)
+    this.powerups = this.powerups.filter(pu => now - pu.born < 30000);
+
+    // Pick-up detection
+    for (let i = this.powerups.length - 1; i >= 0; i--) {
+      const pu = this.powerups[i];
+      for (const [pkey, p] of [['p1', this.player1], ['p2', this.player2]]) {
+        const dist = Math.hypot(p.x - pu.x, p.y - pu.y);
+        if (dist < p.radius + pu.radius) {
+          // Apply effect
+          const dur = { weapon_grow: 8000, damage_boost: 8000, speed_boost: 6000, shield: 6000 }[pu.type] || 6000;
+          this.effects[pkey][pu.type] = now + dur;
+          // Spawn pick-up particles
+          for (let j = 0; j < 14; j++) {
+            const colors = { weapon_grow:'#ffd700', damage_boost:'#ff4444', speed_boost:'#00ffaa', shield:'#4488ff' };
+            this.particles.push({
+              x: pu.x, y: pu.y,
+              vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8 - 3,
+              life: 40 + Math.random() * 20, maxLife: 60,
+              color: colors[pu.type], size: 3 + Math.random() * 3
+            });
+          }
+          this.powerups.splice(i, 1);
+          break;
+        }
       }
     }
   }
@@ -344,13 +479,25 @@ export class GameState {
   }
 
   toJSON() {
+    const now = Date.now();
     return {
-      player1:  this.serializePlayer(this.player1),
-      player2:  this.serializePlayer(this.player2),
+      player1:   this.serializePlayer(this.player1),
+      player2:   this.serializePlayer(this.player2),
       particles: this.particles,
-      timer:    Math.ceil(this.timeRemaining / 1000),
-      mapId:    this.mapId,
-      lavaY:    this.lavaY
+      timer:     Math.ceil(this.timeRemaining / 1000),
+      mapId:     this.mapId,
+      lavaY:     this.lavaY,
+      powerups:  this.powerups,
+      map: {
+        platforms: this.map.platforms,
+        obstacles: this.map.obstacles,
+        hasGround: this.map.hasGround,
+        groundY:   this.map.groundY
+      },
+      effects: {
+        p1: Object.fromEntries(Object.entries(this.effects.p1).map(([k,v]) => [k, Math.max(0, v - now)])),
+        p2: Object.fromEntries(Object.entries(this.effects.p2).map(([k,v]) => [k, Math.max(0, v - now)]))
+      }
     };
   }
 

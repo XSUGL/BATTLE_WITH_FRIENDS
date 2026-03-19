@@ -1,59 +1,262 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Battle With Friend - Dashboard</title>
-  <link rel="stylesheet" href="css/styles.css">
-  <link rel="stylesheet" href="css/dashboard.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle With Friend — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04080f;--bg2:#070d18;--surface:#0b1525;--border:#162235;--border2:#1e3048;
+  --accent:#00d4ff;--accent2:#ff3d5c;--gold:#ffbe00;--green:#00ff9d;
+  --text:#c4d8f0;--text2:#5a7a99;--text3:#243040;
+}
+html,body{min-height:100%}
+body{
+  font-family:'Rajdhani',sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;position:relative;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(rgba(0,212,255,.1) 1px,transparent 1px);
+  background-size:30px 30px;
+  mask-image:radial-gradient(ellipse 100% 100% at 50% 40%,black 20%,transparent 90%);
+  -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 40%,black 20%,transparent 90%);
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 5%,rgba(0,212,255,.06),transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 95%,rgba(255,61,92,.05),transparent 55%);
+}
+/* ── HEADER ── */
+.dashboard-container{min-height:100vh;position:relative;z-index:1}
+.dashboard-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 48px;height:66px;
+  background:rgba(4,8,15,.96);
+  border-bottom:1px solid var(--border2);
+  position:sticky;top:0;z-index:10;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+.dashboard-header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.5),rgba(255,61,92,.2),transparent);
+}
+.dashboard-header h1{
+  font-family:'Orbitron',monospace;font-size:13px;font-weight:900;
+  letter-spacing:5px;color:#fff;margin:0;
+  text-shadow:0 0 25px rgba(0,212,255,.5);
+}
+.user-info{display:flex;align-items:center;gap:20px}
+#username-display{
+  font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:var(--accent);
+}
+/* ── BUTTONS ── */
+.btn{
+  border:none;border-radius:7px;font-family:'Orbitron',monospace;
+  font-weight:700;letter-spacing:3px;cursor:pointer;
+  transition:all .2s;text-transform:uppercase;position:relative;overflow:hidden;
+}
+.btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.08),transparent 55%);pointer-events:none;
+}
+.btn-primary{
+  padding:11px 22px;font-size:9px;
+  background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(0,150,200,.1));
+  color:var(--accent);border:1px solid rgba(0,212,255,.45);
+  box-shadow:0 0 20px rgba(0,212,255,.1);
+}
+.btn-primary:hover{
+  background:linear-gradient(135deg,rgba(0,212,255,.32),rgba(0,180,230,.16));
+  box-shadow:0 0 35px rgba(0,212,255,.3);transform:translateY(-1px);
+}
+.btn-secondary{
+  padding:8px 22px;font-size:9px;
+  background:rgba(255,255,255,.04);color:var(--text2);border:1px solid var(--border2);
+}
+.btn-secondary:hover{background:rgba(255,255,255,.09);color:var(--text)}
+/* ── GRID ── */
+.dashboard-main{
+  max-width:1280px;margin:36px auto;padding:0 32px;
+  display:grid;grid-template-columns:1fr 1fr;gap:22px;
+  position:relative;z-index:1;
+}
+/* ── SECTIONS (cards) ── */
+section{
+  background:linear-gradient(145deg,rgba(11,21,37,.95),rgba(4,8,15,.98));
+  border:1px solid var(--border);border-radius:18px;padding:30px;
+  position:relative;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.35);
+  transition:border-color .25s;
+}
+section:hover{border-color:var(--border2)}
+section::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.3),transparent);
+}
+section::after{
+  content:'';position:absolute;top:0;left:0;width:44px;height:44px;
+  border-top:1px solid rgba(0,212,255,.35);border-left:1px solid rgba(0,212,255,.35);
+  border-radius:18px 0 0 0;pointer-events:none;
+}
+.invitations-section{grid-column:1;grid-row:1}
+.leaderboard-section{grid-column:2;grid-row:1/3}
+.match-history-section{grid-column:1;grid-row:2}
+/* section titles via h2 */
+section h2{
+  font-family:'Orbitron',monospace;font-size:9px;font-weight:700;
+  letter-spacing:5px;color:var(--accent);margin-bottom:24px;
+  display:flex;align-items:center;gap:12px;text-transform:uppercase;
+}
+section h2::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,var(--border2),transparent);
+}
+section h3{
+  font-family:'Orbitron',monospace;font-size:8px;letter-spacing:3px;
+  color:var(--text2);margin:22px 0 12px;text-transform:uppercase;
+}
+/* ── INVITE FORM ── */
+#invite-form .form-group{display:flex;gap:10px;margin-bottom:10px}
+#invite-form input{
+  flex:1;padding:13px 16px;
+  background:rgba(4,8,15,.85);border:1px solid var(--border2);
+  border-radius:8px;font-size:15px;color:#fff;
+  font-family:'Rajdhani',sans-serif;outline:none;transition:border-color .2s;
+}
+#invite-form input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,.1)}
+#invite-form input::placeholder{color:var(--text3)}
+#invite-form button{padding:13px 22px;font-size:9px;width:auto}
+/* errors/success */
+.error-message{
+  color:var(--accent2);font-size:11px;letter-spacing:1px;
+  margin-top:6px;display:none;font-family:'Orbitron',monospace;
+}
+.error-message.show{display:block}
+.success-message{
+  color:var(--green);font-size:11px;letter-spacing:1px;
+  margin-top:6px;display:none;font-family:'Orbitron',monospace;
+}
+.success-message.show{display:block}
+/* ── INVITATION LIST ── */
+.invitations-list{display:flex;flex-direction:column;gap:10px}
+.invitation-item{
+  background:rgba(4,8,15,.7);
+  border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:8px;padding:13px 16px;
+  display:flex;justify-content:space-between;align-items:center;
+  transition:background .2s;
+}
+.invitation-item:hover{background:rgba(0,212,255,.04)}
+.invitation-info .username{font-size:16px;font-weight:600;color:#fff;margin-bottom:2px}
+.invitation-info .time{font-size:10px;color:var(--text2);letter-spacing:.5px}
+.invitation-actions button{padding:8px 16px;font-size:9px;width:auto}
+/* ── LEADERBOARD ── */
+.leaderboard-table{width:100%;border-collapse:collapse}
+.leaderboard-table thead tr{background:rgba(4,8,15,.7)}
+.leaderboard-table th{
+  padding:11px 14px;text-align:left;
+  font-family:'Orbitron',monospace;font-size:8px;letter-spacing:3px;
+  color:var(--text2);border-bottom:1px solid var(--border2);text-transform:uppercase;
+}
+.leaderboard-table td{
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  font-size:15px;color:var(--text);transition:background .15s;
+}
+.leaderboard-table tbody tr:hover{background:rgba(0,212,255,.04)}
+.leaderboard-row-current-user{
+  background:rgba(0,212,255,.07)!important;border-left:2px solid var(--accent);
+}
+.leaderboard-row-current-user td{color:#fff;font-weight:600}
+/* ── MATCH HISTORY ── */
+.match-history-list{display:flex;flex-direction:column;gap:10px}
+.match-history-item{
+  background:rgba(4,8,15,.7);
+  border:1px solid var(--border);border-left:3px solid var(--border2);
+  border-radius:8px;padding:13px 16px;transition:background .2s;
+}
+.match-history-item:hover{background:rgba(255,255,255,.02)}
+.match-history-item.result-win{border-left-color:var(--green)}
+.match-history-item.result-loss{border-left-color:var(--accent2)}
+.match-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.match-result{
+  display:inline-block;padding:3px 11px;border-radius:20px;
+  font-family:'Orbitron',monospace;font-size:8px;letter-spacing:2px;font-weight:700;
+}
+.match-result.result-win{background:rgba(0,255,157,.1);color:var(--green);border:1px solid rgba(0,255,157,.3)}
+.match-result.result-loss{background:rgba(255,61,92,.1);color:var(--accent2);border:1px solid rgba(255,61,92,.3)}
+.match-result.result-cancelled{background:rgba(255,255,255,.05);color:var(--text2);border:1px solid var(--border2)}
+.match-date{font-size:10px;color:var(--text3)}
+.match-details{display:flex;justify-content:space-between;align-items:center}
+.opponent{font-weight:600;color:var(--text);font-size:15px}
+.score-display{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:1px}
+.score-display .positive{color:var(--green)}
+.score-display .negative{color:var(--accent2)}
+/* empty/loading */
+section p{color:var(--text2);font-size:12px;font-family:'Orbitron',monospace;letter-spacing:1px;padding:16px 0;text-align:center}
+/* ── RESPONSIVE ── */
+@media(max-width:960px){
+  .dashboard-main{grid-template-columns:1fr}
+  .invitations-section,.leaderboard-section,.match-history-section{grid-column:1;grid-row:auto}
+  .dashboard-header{padding:0 20px}
+}
+@media(max-width:480px){
+  #invite-form .form-group{flex-direction:column}
+  #invite-form button{width:100%}
+  .dashboard-main{padding:0 14px}
+}
+</style>
 </head>
 <body>
-  <div class="dashboard-container">
-    <header class="dashboard-header">
-      <h1>Battle With Friend</h1>
-      <div class="user-info">
-        <span id="username-display"></span>
-        <button id="logout-btn" class="btn btn-secondary">Logout</button>
+<div class="dashboard-container">
+
+  <header class="dashboard-header">
+    <h1>⚔ BATTLE WITH FRIEND</h1>
+    <div class="user-info">
+      <span id="username-display"></span>
+      <button id="logout-btn" class="btn btn-secondary">LOGOUT</button>
+    </div>
+  </header>
+
+  <main class="dashboard-main">
+
+    <!-- Invitations — IDs identici al dashboard.js originale -->
+    <section class="invitations-section">
+      <h2>CHALLENGE</h2>
+      <form id="invite-form">
+        <div class="form-group">
+          <input type="text" id="invite-username" placeholder="Enter username..." required>
+          <button type="submit" class="btn btn-primary">INVITE</button>
+        </div>
+        <div id="invite-error" class="error-message"></div>
+        <div id="invite-success" class="success-message"></div>
+      </form>
+      <h3>INCOMING CHALLENGES</h3>
+      <div id="invitations-container" class="invitations-list">
+        <p>Loading...</p>
       </div>
-    </header>
-    
-    <main class="dashboard-main">
-      <!-- Invitations Section -->
-      <section class="invitations-section">
-        <h2>Send Invitation</h2>
-        <form id="invite-form">
-          <div class="form-group">
-            <input type="text" id="invite-username" placeholder="Enter username" required>
-            <button type="submit" class="btn btn-primary">Send Invite</button>
-          </div>
-          <div id="invite-error" class="error-message"></div>
-          <div id="invite-success" class="success-message"></div>
-        </form>
-        
-        <h3>Active Invitations</h3>
-        <div id="invitations-container" class="invitations-list">
-          <p>Loading invitations...</p>
-        </div>
-      </section>
-      
-      <!-- Leaderboard Section -->
-      <section class="leaderboard-section">
-        <h2>Leaderboard</h2>
-        <div id="leaderboard-container">
-          <p>Loading leaderboard...</p>
-        </div>
-      </section>
-      
-      <!-- Match History Section -->
-      <section class="match-history-section">
-        <h2>Match History</h2>
-        <div id="match-history-container">
-          <p>Loading match history...</p>
-        </div>
-      </section>
-    </main>
-  </div>
-  
-  <script type="module" src="js/dashboard.js"></script>
+    </section>
+
+    <!-- Leaderboard -->
+    <section class="leaderboard-section">
+      <h2>LEADERBOARD</h2>
+      <div id="leaderboard-container">
+        <p>Loading...</p>
+      </div>
+    </section>
+
+    <!-- Match History -->
+    <section class="match-history-section">
+      <h2>MATCH HISTORY</h2>
+      <div id="match-history-container">
+        <p>Loading...</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+<script type="module" src="js/dashboard.js"></script>
 </body>
 </html>

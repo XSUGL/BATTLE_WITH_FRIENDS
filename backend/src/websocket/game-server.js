@@ -13,6 +13,7 @@ export function createGameServer(httpServer) {
         const message = JSON.parse(data);
         if      (message.type === 'join_match')   await handleJoinMatch(ws, message);
         else if (message.type === 'select_class')  handleSelectClass(ws, message);
+        else if (message.type === 'vote_map')      handleVoteMap(ws, message);
         else if (message.type === 'player_ready')  handlePlayerReady(ws);
         else if (message.type === 'game_ready')    handleGameReady(ws);
         else if (message.type === 'input')         handleInput(ws, message);
@@ -112,6 +113,11 @@ function handlePlayerReady(ws) {
 function handleInput(ws, message) {
   const room = rooms.get(ws.matchId);
   if (room) room.updatePlayerInput(ws.playerNumber, message.keys);
+}
+
+function handleVoteMap(ws, message) {
+  const room = rooms.get(ws.matchId);
+  if (room) room.voteMap(ws.playerNumber, message.mapId);
 }
 
 function handleForfeit(ws) {

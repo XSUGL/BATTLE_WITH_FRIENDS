@@ -2,14 +2,15 @@ import { getToken, getUser } from './api/auth-api.js';
 
 const urlParams = new URLSearchParams(window.location.search);
 const matchId   = parseInt(urlParams.get('matchId'));
-if (!matchId) { window.location.href = '/dashboard.html'; }
+if (!matchId) window.location.href = '/dashboard.html';
 
 const user  = getUser();
 const token = getToken();
-if (!user || !token) { window.location.href = '/index.html'; }
+if (!user || !token) window.location.href = '/index.html';
 
 let ws, playerNumber, gameState = null;
 let currentMapId = 'arena';
+let savedMapGeo  = { platforms:[], obstacles:[], hasGround:true, groundY:460 };
 
 const canvas        = document.getElementById('gameCanvas');
 const ctx           = canvas.getContext('2d');
@@ -22,442 +23,461 @@ const p1emoji       = document.getElementById('p1emoji');
 const p2emoji       = document.getElementById('p2emoji');
 const p1name        = document.getElementById('p1name');
 const p2name        = document.getElementById('p2name');
+const effects1      = document.getElementById('effects1');
+const effects2      = document.getElementById('effects2');
 const statusOverlay = document.getElementById('statusOverlay');
 const statusMessage = document.getElementById('statusMessage');
 const statusSub     = document.getElementById('statusSub');
 const statusIcon    = document.getElementById('statusIcon');
 
-const keys = { up: false, down: false, left: false, right: false };
+const keys = { up:false, down:false, left:false, right:false };
 
-// ── Map visual configs (solo frontend) ──
-const MAP_CONFIGS = {
-  arena: {
-    bgColor: '#070b11', hasGround: true, groundY: 460,
-    groundColor: 'rgba(0,200,255,0.5)', platforms: []
-  },
-  platforms: {
-    bgColor: '#080f0a', hasGround: true, groundY: 460,
-    groundColor: 'rgba(80,200,80,0.5)', platformColor: 'rgba(80,200,80,0.7)',
-    platforms: [
-      { x: 80,  y: 340, w: 140, h: 14 },
-      { x: 580, y: 340, w: 140, h: 14 },
-      { x: 320, y: 260, w: 160, h: 14 },
-      { x: 160, y: 180, w: 120, h: 14 },
-      { x: 520, y: 180, w: 120, h: 14 }
-    ]
-  },
-  space: {
-    bgColor: '#02020f', hasGround: false, groundY: 500,
-    groundColor: 'rgba(100,100,255,0.3)', platforms: []
-  },
-  volcano: {
-    bgColor: '#110500', hasGround: true, groundY: 460,
-    groundColor: 'rgba(255,80,0,0.8)', platformColor: 'rgba(200,80,20,0.8)',
-    platforms: [
-      { x: 60,  y: 300, w: 120, h: 14 },
-      { x: 620, y: 300, w: 120, h: 14 },
-      { x: 290, y: 220, w: 220, h: 14 }
-    ]
-  }
+// Visual style per mappa (solo colori, coordinate vengono dal server)
+const MAP_STYLE = {
+  arena:    { bg:'#070b11', groundColor:'rgba(0,200,255,0.5)', platFill:'rgba(0,180,220,0.7)', platBorder:'#00c8ff', obsFill:'#0d3d55', obsBorder:'#00c8ff', obsStripe:'rgba(0,200,255,0.3)' },
+  platforms:{ bg:'#060c08', groundColor:'rgba(60,200,80,0.5)',  platFill:'rgba(60,200,80,0.7)',  platBorder:'#00c850', obsFill:'#0d3d1a', obsBorder:'#00c850', obsStripe:'rgba(0,200,80,0.3)' },
+  space:    { bg:'#02020f', groundColor:'rgba(100,100,255,0.3)',platFill:'rgba(130,80,255,0.7)', platBorder:'#9050ff', obsFill:'#1a0a4a', obsBorder:'#9050ff', obsStripe:'rgba(140,80,255,0.3)' },
+  volcano:  { bg:'#110400', groundColor:'rgba(255,80,0,0.8)',   platFill:'rgba(200,70,15,0.8)',  platBorder:'#ff6000', obsFill:'#4a1500', obsBorder:'#ff6000', obsStripe:'rgba(255,100,0,0.3)' },
 };
 
-// ── WebSocket ──
-function connect() {
+const PU = {
+  weapon_grow: { icon:'⚡', color:'#ffbe00', label:'+SIZE'  },
+  damage_boost:{ icon:'🔥', color:'#ff4040', label:'+DMG'   },
+  speed_boost: { icon:'💨', color:'#00ff9d', label:'+SPEED' },
+  shield:      { icon:'🛡', color:'#4488ff', label:'SHIELD' }
+};
+
+let stars = [];
+function initStars(W,H){
+  stars=[];
+  for(let i=0;i<160;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+.2,a:Math.random()*.85+.15});
+}
+
+// ─── WebSocket ───
+function connect(){
   ws = new WebSocket('ws://localhost:3000');
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token }));
-  };
-
+  ws.onopen = () => ws.send(JSON.stringify({type:'join_match',matchId,userId:user.id,token}));
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    switch (msg.type) {
-
+    switch(msg.type){
       case 'joined':
         playerNumber = msg.playerNumber;
-        setStatus('⚔️', 'WAITING', 'Opponent connecting...');
-        ws.send(JSON.stringify({ type: 'game_ready' }));
+        setStatus('⚔️','WAITING FOR OPPONENT','');
+        ws.send(JSON.stringify({type:'game_ready'}));
         break;
-
+      case 'opponent_connected':
+        setStatus('🎮','OPPONENT CONNECTED','Choose your fighter...');
+        break;
       case 'opponent_joined':
-        setStatus('🎮', 'READY!', 'Get ready...');
+        setStatus('🔥','BOTH READY','Prepare to fight!');
         break;
-
       case 'countdown':
-        statusMessage.className = 'status-message countdown';
-        setStatus('', String(msg.seconds), 'FIGHT!');
+        statusMessage.className='status-message countdown';
+        setStatus('',String(msg.seconds),'');
         break;
-
       case 'game_start':
         gameState    = msg.initialState;
         currentMapId = msg.mapId || 'arena';
+        // Salva geometria mappa — non viene persa nei state_update
+        if(gameState.map) savedMapGeo = gameState.map;
         p1emoji.textContent = gameState.player1.emoji;
-        p1name.textContent  = gameState.player1.name;
+        p1name.textContent  = gameState.player1.name.toUpperCase();
         p2emoji.textContent = gameState.player2.emoji;
-        p2name.textContent  = gameState.player2.name;
+        p2name.textContent  = gameState.player2.name.toUpperCase();
+        initStars(canvas.width, canvas.height);
         hideStatus();
         startGameLoop();
         break;
-
       case 'state_update':
         gameState = msg.state;
+        currentMapId = msg.state.mapId || currentMapId;
         break;
-
-      case 'game_over':
+      case 'game_over': {
         const won = playerNumber === msg.winner;
         statusMessage.className = 'status-message';
-        setStatus(won ? '🏆' : '💀', won ? 'VICTORY!' : 'DEFEAT', 'Returning to dashboard...');
-        setTimeout(() => window.location.href = '/dashboard.html', 4000);
+        setStatus(won?'🏆':'💀', won?'VICTORY!':'DEFEAT', 'Returning to dashboard...');
+        setTimeout(()=>window.location.href='/dashboard.html', 4000);
         break;
-
+      }
       case 'error':
         alert(msg.message);
         window.location.href = '/dashboard.html';
         break;
     }
   };
-
   ws.onclose = () => {
-    if (gameState) {
-      statusMessage.className = 'status-message';
-      setStatus('📡', 'DISCONNECTED', 'Connection lost');
-    }
+    if(gameState){ statusMessage.className='status-message'; setStatus('📡','DISCONNECTED','Connection lost'); }
   };
 }
 
-// ── Game Loop ──
-function startGameLoop() {
-  setInterval(() => { if (gameState) { render(); updateUI(); } }, 1000 / 60);
-  setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', keys }));
-  }, 50);
-  setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'heartbeat' }));
-  }, 5000);
+// ─── Game Loop ───
+function startGameLoop(){
+  setInterval(()=>{ if(gameState){ render(); updateUI(); } }, 1000/60);
+  setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'input',keys})); }, 50);
+  setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'heartbeat'})); }, 5000);
 }
 
-// ── Render ──
-function render() {
+// ─── RENDER ───
+function render(){
   const W = canvas.width, H = canvas.height;
-  const map = MAP_CONFIGS[currentMapId] || MAP_CONFIGS.arena;
+  const t = Date.now()/1000;
+  const style = MAP_STYLE[currentMapId] || MAP_STYLE.arena;
 
-  // Sfondo
-  ctx.fillStyle = map.bgColor;
+  // Geometria mappa salvata al game_start — non viene sovrascritta dai state_update
+  const mapGeo    = savedMapGeo;
+  const platforms = mapGeo.platforms || [];
+  const obstacles = mapGeo.obstacles || [];
+  const hasGround = mapGeo.hasGround !== false;
+  const groundY   = mapGeo.groundY || 460;
+
+  // Reset context
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur  = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.setLineDash([]);
+
+  // ── Background ──
+  ctx.fillStyle = style.bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Stelle per spazio
-  if (currentMapId === 'space') drawStars(W, H);
+  if(currentMapId === 'space') drawStars(W, H, t);
 
-  // Griglia
-  ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.015)';
   ctx.lineWidth = 1;
-  for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-  for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  for(let x=0;x<=W;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+  for(let y=0;y<=H;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
 
-  // Suolo
-  if (map.hasGround) {
-    const groundY = map.groundY;
-    const gg = ctx.createLinearGradient(0, groundY, 0, H);
-    gg.addColorStop(0, map.groundColor);
-    gg.addColorStop(1, 'transparent');
-    ctx.fillStyle = gg;
+  // ── Ground ──
+  if(hasGround){
+    ctx.fillStyle = style.groundColor;
     ctx.fillRect(0, groundY, W, H - groundY);
-    ctx.strokeStyle = map.groundColor;
+    ctx.strokeStyle = style.groundColor;
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
   }
 
-  // Piattaforme
-  if (map.platforms && map.platforms.length > 0) {
-    for (const p of map.platforms) {
-      const pg = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
-      pg.addColorStop(0, map.platformColor || 'rgba(100,200,100,0.7)');
-      pg.addColorStop(1, map.platformColor ? darken(map.platformColor, 0.3) : 'rgba(60,140,60,0.4)');
-      ctx.fillStyle = pg;
-      ctx.shadowColor = map.platformColor || 'rgba(100,200,100,0.5)';
-      ctx.shadowBlur = 8;
-      ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 4); ctx.fill();
-      ctx.shadowBlur = 0;
-    }
+  // ── Platforms ──
+  for(const p of platforms){
+    ctx.fillStyle = style.platFill;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    // top highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(p.x+3, p.y+1); ctx.lineTo(p.x+p.w-3, p.y+1); ctx.stroke();
+    // border
+    ctx.strokeStyle = style.platBorder;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(p.x, p.y, p.w, p.h);
   }
 
-  // Lava (vulcano)
-  if (currentMapId === 'volcano' && gameState.lavaY) {
-    drawLava(W, H, gameState.lavaY);
+  // ── Obstacles ──  (coordinate dal server = stessa fisica)
+  for(const obs of obstacles){
+    drawObstacle(obs, style, t);
   }
 
-  // Particelle
-  if (gameState.particles) {
-    for (const p of gameState.particles) {
-      ctx.globalAlpha = p.life / p.maxLife;
-      ctx.fillStyle = p.color;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
+  // ── Lava ──
+  if(currentMapId==='volcano' && gameState.lavaY){
+    drawLava(W, H, gameState.lavaY, t);
   }
 
-  drawPlayer(gameState.player1);
+  // ── Powerups ──
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  for(const pu of (gameState.powerups||[])){
+    drawPowerup(pu, t);
+  }
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.setLineDash([]);
+
+  // ── Particles ──
+  for(const p of (gameState.particles||[])){
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle   = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Players ──
   drawPlayer(gameState.player2);
+  drawPlayer(gameState.player1);
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 }
 
-function drawStars(W, H) {
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  const seeds = [42,137,283,512,711,900,1024,200,333,450,600,750,850,950,100,77,321,654,888,222];
-  for (const s of seeds) {
-    const x = (s * 53) % W;
-    const y = (s * 37) % H;
-    const r = s % 3 === 0 ? 1.5 : 1;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  }
-}
+// ─── OBSTACLE ─── usa le coordinate esatte passate dal server
+function drawObstacle(obs, style, t){
+  const x=obs.x, y=obs.y, w=obs.w, h=obs.h;
 
-function drawLava(W, H, lavaY) {
-  const lg = ctx.createLinearGradient(0, lavaY, 0, H);
-  lg.addColorStop(0, 'rgba(255,120,0,0.9)');
-  lg.addColorStop(0.3, 'rgba(255,50,0,0.8)');
-  lg.addColorStop(1, 'rgba(180,0,0,0.95)');
-  ctx.fillStyle = lg;
-  ctx.fillRect(0, lavaY, W, H - lavaY);
+  // body
+  ctx.fillStyle = style.obsFill;
+  ctx.fillRect(x, y, w, h);
 
-  // Bordo ondulato
-  ctx.strokeStyle = 'rgba(255,200,0,0.9)';
-  ctx.lineWidth = 3;
-  ctx.shadowColor = 'rgba(255,150,0,0.8)';
-  ctx.shadowBlur = 14;
+  // stripes clipped
+  ctx.save();
   ctx.beginPath();
-  const t = Date.now() / 300;
-  ctx.moveTo(0, lavaY);
-  for (let x = 0; x <= W; x += 20) {
-    ctx.lineTo(x, lavaY + Math.sin(x / 40 + t) * 5);
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.strokeStyle = style.obsStripe;
+  ctx.lineWidth = 7;
+  for(let sx = x - h*2; sx < x + w + h; sx += 16){
+    ctx.beginPath();
+    ctx.moveTo(sx, y+h);
+    ctx.lineTo(sx+h*2, y);
+    ctx.stroke();
   }
-  ctx.lineTo(W, lavaY);
+  ctx.restore();
+
+  // border
+  ctx.strokeStyle = style.obsBorder;
+  ctx.lineWidth   = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  // top highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(x+3, y+1);
+  ctx.lineTo(x+w-3, y+1);
   ctx.stroke();
-  ctx.shadowBlur = 0;
+
+  // shimmer
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  const sx = x + ((t*55) % (w+50)) - 25;
+  const sg = ctx.createLinearGradient(sx, 0, sx+25, 0);
+  sg.addColorStop(0, 'rgba(255,255,255,0)');
+  sg.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+  sg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
 }
 
-function drawPlayer(p) {
-  if (!p) return;
-  const color = p.color;
-  const cx = p.x, cy = p.y;
+// ─── LAVA ───
+function drawLava(W,H,lavaY,t){
+  const pts=[];
+  for(let x=0;x<=W;x+=8) pts.push({x,y:lavaY+Math.sin(x*.04+t*1.4)*5+Math.sin(x*.015+t*.9)*4});
+  ctx.fillStyle='rgba(255,80,0,0.9)';
+  ctx.beginPath(); ctx.moveTo(0,lavaY);
+  for(const p of pts) ctx.lineTo(p.x,p.y);
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(255,200,0,0.9)';
+  ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  for(const p of pts) ctx.lineTo(p.x,p.y);
+  ctx.stroke();
+}
 
-  // Ombra a terra
-  const map = MAP_CONFIGS[currentMapId] || MAP_CONFIGS.arena;
-  const shadowGrad = ctx.createRadialGradient(cx, map.groundY, 0, cx, map.groundY, p.radius * 2);
-  shadowGrad.addColorStop(0, p.shadowColor || 'rgba(255,255,255,0.1)');
-  shadowGrad.addColorStop(1, 'transparent');
-  ctx.fillStyle = shadowGrad;
-  ctx.beginPath(); ctx.ellipse(cx, map.groundY, p.radius * 1.5, 6, 0, 0, Math.PI * 2); ctx.fill();
+// ─── STARS ───
+function drawStars(W,H,t){
+  for(const s of stars){
+    ctx.globalAlpha = s.a*(0.65+0.35*Math.sin(t*1.2+s.x*.01));
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
 
-  // Alone
-  const glowGrad = ctx.createRadialGradient(cx, cy, p.radius * 0.3, cx, cy, p.radius * 2);
-  glowGrad.addColorStop(0, p.shadowColor || 'rgba(255,255,255,0.1)');
-  glowGrad.addColorStop(1, 'transparent');
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath(); ctx.arc(cx, cy, p.radius * 2, 0, Math.PI * 2); ctx.fill();
+// ─── POWERUP ───
+function drawPowerup(pu,t){
+  const vis=PU[pu.type]; if(!vis) return;
+  const by=pu.y+Math.sin(t*2.8+pu.id*.001)*5;
+  ctx.strokeStyle=vis.color; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(pu.x,by,pu.radius+6,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(4,8,15,0.75)';
+  ctx.beginPath(); ctx.arc(pu.x,by,pu.radius,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=vis.color; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(pu.x,by,pu.radius,0,Math.PI*2); ctx.stroke();
+  ctx.font=`${pu.radius+2}px serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(vis.icon,pu.x,by+1);
+  ctx.font='bold 8px monospace'; ctx.fillStyle=vis.color;
+  ctx.globalAlpha=0.8+0.2*Math.sin(t*3);
+  ctx.fillText(vis.label,pu.x,by+pu.radius+12);
+  ctx.globalAlpha=1; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
 
-  // Flash danno
-  const isFlashing = p.hitFlash > 0 && p.hitFlash % 2 === 0;
+// ─── PLAYER ───
+function drawPlayer(p){
+  if(p.dead) return;
+  const effs = gameState.effects?.[p.num===1?'p1':'p2'] || {};
+  const hasShield = effs.shield>0;
+  const hasDmg    = effs.damage_boost>0;
+  const hasSpeed  = effs.speed_boost>0;
+  const isFlash   = p.hitFlash>0;
+  const t = Date.now()/1000;
 
-  // Corpo sfera
-  const bodyGrad = ctx.createRadialGradient(cx - p.radius * 0.3, cy - p.radius * 0.3, 0, cx, cy, p.radius);
-  bodyGrad.addColorStop(0, isFlashing ? '#ffffff' : lighten(color, 0.4));
-  bodyGrad.addColorStop(0.6, isFlashing ? '#ffaaaa' : color);
-  bodyGrad.addColorStop(1, isFlashing ? '#ff4444' : darken(color, 0.4));
+  // speed trail
+  if(hasSpeed && (Math.abs(p.vx)>0.5 || Math.abs(p.vy)>0.5)){
+    for(let i=1;i<=3;i++){
+      ctx.globalAlpha=0.1/i; ctx.fillStyle='#00ff9d';
+      ctx.beginPath(); ctx.arc(p.x-p.vx*i*3, p.y-p.vy*i*3, p.radius*(1-i*.2), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
 
-  ctx.shadowColor = color;
-  ctx.shadowBlur  = isFlashing ? 30 : 16;
-  ctx.fillStyle   = bodyGrad;
-  ctx.beginPath(); ctx.arc(cx, cy, p.radius, 0, Math.PI * 2); ctx.fill();
+  // shield aura
+  if(hasShield){
+    ctx.strokeStyle=`rgba(68,136,255,${0.5+0.3*Math.sin(t*4)})`;
+    ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+12,0,Math.PI*2); ctx.stroke();
+  }
+
+  // body
+  const g=ctx.createRadialGradient(p.x-p.radius*.3,p.y-p.radius*.3,0,p.x,p.y,p.radius);
+  if(isFlash){
+    g.addColorStop(0,'#fff'); g.addColorStop(.5,'#faa'); g.addColorStop(1,'#f33');
+  } else {
+    g.addColorStop(0,lighten(p.color,.3)); g.addColorStop(.6,p.color); g.addColorStop(1,darken(p.color,.4));
+  }
+  ctx.shadowColor = isFlash?'#fff':(hasDmg?'#ff3333':p.color);
+  ctx.shadowBlur  = isFlash?36:(hasDmg?26:16);
+  ctx.fillStyle   = g;
+  ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2); ctx.fill();
   ctx.shadowBlur  = 0;
 
-  // Riflesso
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.beginPath(); ctx.ellipse(cx - p.radius * 0.25, cy - p.radius * 0.3, p.radius * 0.35, p.radius * 0.2, -0.5, 0, Math.PI * 2); ctx.fill();
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(p.x-p.radius*.28,p.y-p.radius*.32,p.radius*.32,p.radius*.18,-0.5,0,Math.PI*2);
+  ctx.fill();
 
-  drawWeapons(p);
+  drawWeapons(p,effs);
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
 }
 
-function drawWeapons(p) {
-  // Orbita tratteggiata
-  if (p.weapons.length > 0) {
+function drawWeapons(p,effs){
+  const grow = effs?.weapon_grow>0;
+  const sm   = grow ? 1.85 : 1;
+  for(const w of p.weapons){
+    const ox=p.x+Math.cos(w.currentAngle)*w.orbitRadius;
+    const oy=p.y+Math.sin(w.currentAngle)*w.orbitRadius;
     ctx.save();
-    ctx.setLineDash([3, 8]);
-    ctx.strokeStyle = `${p.color}22`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.weapons[0].orbitRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-
-  for (const w of p.weapons) {
-    const angle = w.currentAngle;
-    const ox = p.x + Math.cos(angle) * w.orbitRadius;
-    const oy = p.y + Math.sin(angle) * w.orbitRadius;
-    ctx.save();
-    ctx.translate(ox, oy);
-    ctx.rotate(angle + Math.PI / 2);
-    drawWeaponShape(w.type, w.length, w.width, p.color);
-    ctx.restore();
-  }
-}
-
-function drawWeaponShape(type, length, width, color) {
-  ctx.shadowColor = color;
-  ctx.shadowBlur  = 10;
-
-  switch (type) {
-    case 'sword': {
-      const sg = ctx.createLinearGradient(0, -length/2, 0, length/2);
-      sg.addColorStop(0, '#ffffff');
-      sg.addColorStop(0.3, color);
-      sg.addColorStop(1, darken(color, 0.5));
-      ctx.fillStyle = sg;
-      ctx.beginPath();
-      ctx.moveTo(0, -length/2);
-      ctx.lineTo(width/2, length/4);
-      ctx.lineTo(0, length/2);
-      ctx.lineTo(-width/2, length/4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#aaa';
-      ctx.fillRect(-width*1.2, length/4 - 3, width*2.4, 5);
-      break;
-    }
-    case 'mace': {
-      ctx.fillStyle = '#8B5E3C';
-      ctx.fillRect(-3, -length/2, 6, length * 0.7);
-      ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(0, -length/2, width/2 + 2, 0, Math.PI * 2); ctx.fill();
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        ctx.fillStyle = darken(color, 0.2);
-        ctx.beginPath();
-        ctx.moveTo(0, -length/2);
-        ctx.lineTo(Math.cos(a) * (width/2 + 8), -length/2 + Math.sin(a) * (width/2 + 8));
-        ctx.lineTo(Math.cos(a + 0.5) * (width/2), -length/2 + Math.sin(a + 0.5) * (width/2));
-        ctx.closePath(); ctx.fill();
+    ctx.translate(ox,oy);
+    ctx.rotate(w.currentAngle+Math.PI/2);
+    const gc=grow?'#ffbe00':p.color;
+    ctx.shadowColor=gc; ctx.shadowBlur=grow?24:10;
+    const l=w.length*sm, wd=w.width*sm;
+    switch(w.type){
+      case 'sword':{
+        const sg=ctx.createLinearGradient(0,-l/2,0,l/2);
+        sg.addColorStop(0,'#fff'); sg.addColorStop(.3,gc); sg.addColorStop(1,darken(p.color,.5));
+        ctx.fillStyle=sg;
+        ctx.beginPath(); ctx.moveTo(0,-l/2); ctx.lineTo(wd/2,l/4); ctx.lineTo(0,l/2); ctx.lineTo(-wd/2,l/4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#aaa'; ctx.fillRect(-wd*1.2,l/4-3,wd*2.4,5);
+        break;
       }
-      break;
-    }
-    case 'scythe': {
-      ctx.fillStyle = '#555';
-      ctx.fillRect(-2, -length/2, 4, length);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.arc(length * 0.3, -length/2, length * 0.45, Math.PI * 1.1, Math.PI * 1.9);
-      ctx.stroke();
-      break;
-    }
-    case 'spear': {
-      ctx.fillStyle = '#8B5E3C';
-      ctx.fillRect(-2, -length/2 + 10, 4, length - 10);
-      const spg = ctx.createLinearGradient(0, -length/2, 0, -length/2 + 18);
-      spg.addColorStop(0, '#fff');
-      spg.addColorStop(1, color);
-      ctx.fillStyle = spg;
-      ctx.beginPath();
-      ctx.moveTo(0, -length/2);
-      ctx.lineTo(width/2, -length/2 + 18);
-      ctx.lineTo(-width/2, -length/2 + 18);
-      ctx.closePath(); ctx.fill();
-      break;
-    }
-    case 'fist': {
-      const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, width/2 + 2);
-      fg.addColorStop(0, lighten(color, 0.3));
-      fg.addColorStop(1, darken(color, 0.2));
-      ctx.fillStyle = fg;
-      ctx.beginPath(); ctx.roundRect(-width/2, -length/2, width, length, 5); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath(); ctx.arc(-width/4 + i * (width/3), -length/2 + 4, 2.5, 0, Math.PI * 2); ctx.fill();
+      case 'mace':{
+        ctx.fillStyle='#6b4226'; ctx.fillRect(-2.5,-l/2,5,l*.65);
+        ctx.fillStyle=gc; ctx.beginPath(); ctx.arc(0,-l/2,wd/2+3,0,Math.PI*2); ctx.fill();
+        for(let i=0;i<7;i++){
+          const a=i/7*Math.PI*2;
+          ctx.fillStyle=darken(gc,.15); ctx.beginPath();
+          ctx.moveTo(0,-l/2); ctx.lineTo(Math.cos(a)*(wd/2+10),-l/2+Math.sin(a)*(wd/2+10));
+          ctx.lineTo(Math.cos(a+.5)*(wd/2),-l/2+Math.sin(a+.5)*(wd/2)); ctx.closePath(); ctx.fill();
+        }
+        break;
       }
-      break;
+      case 'scythe':{
+        ctx.fillStyle='#444'; ctx.fillRect(-2,-l/2,4,l);
+        ctx.strokeStyle=gc; ctx.lineWidth=wd; ctx.lineCap='round';
+        ctx.beginPath(); ctx.arc(l*.3,-l/2,l*.46,Math.PI*1.1,Math.PI*1.9); ctx.stroke();
+        break;
+      }
+      case 'spear':{
+        ctx.fillStyle='#6b4226'; ctx.fillRect(-2,-l/2+14,4,l-14);
+        const spg=ctx.createLinearGradient(0,-l/2,0,-l/2+22);
+        spg.addColorStop(0,'#fff'); spg.addColorStop(1,gc);
+        ctx.fillStyle=spg; ctx.beginPath();
+        ctx.moveTo(0,-l/2); ctx.lineTo(wd/2,-l/2+22); ctx.lineTo(-wd/2,-l/2+22); ctx.closePath(); ctx.fill();
+        break;
+      }
+      case 'fist':{
+        const fg=ctx.createRadialGradient(0,0,0,0,0,wd/2+3);
+        fg.addColorStop(0,lighten(gc,.35)); fg.addColorStop(1,darken(p.color,.2));
+        ctx.fillStyle=fg; ctx.fillRect(-wd/2,-l/2,wd,l);
+        ctx.fillStyle='rgba(255,255,255,0.28)';
+        for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(-wd/4+i*(wd/3),-l/2+4,2.8,0,Math.PI*2); ctx.fill(); }
+        break;
+      }
+      default:{ ctx.fillStyle=gc; ctx.fillRect(-wd/2,-l/2,wd,l); }
     }
-    default: {
-      ctx.fillStyle = color;
-      ctx.fillRect(-width/2, -length/2, width, length);
+    ctx.shadowBlur=0; ctx.restore();
+  }
+}
+
+// ─── UI ───
+function updateUI(){
+  const p1=gameState.player1, p2=gameState.player2;
+  const h1=Math.max(0,p1.hp/p1.maxHp*100);
+  const h2=Math.max(0,p2.hp/p2.maxHp*100);
+  hpBar1.style.width=h1+'%'; hpBar2.style.width=h2+'%';
+  hpText1.textContent=`${Math.ceil(p1.hp)} / ${p1.maxHp}`;
+  hpText2.textContent=`${Math.ceil(p2.hp)} / ${p2.maxHp}`;
+  hpBar1.style.background=h1<25?'linear-gradient(90deg,#f00,#f33)':h1<50?'linear-gradient(90deg,#f80,#fa0)':'';
+  hpBar2.style.background=h2<25?'linear-gradient(90deg,#f00,#f33)':h2<50?'linear-gradient(90deg,#f80,#fa0)':'';
+  const t=Math.max(0,gameState.timer);
+  timerEl.textContent=`${Math.floor(t/60)}:${(t%60).toString().padStart(2,'0')}`;
+  timerEl.classList.toggle('danger',t<=30);
+  updateEffects(effects1, gameState.effects?.p1||{});
+  updateEffects(effects2, gameState.effects?.p2||{});
+}
+
+const PILLS={
+  weapon_grow: {cls:'effect-weapon_grow',txt:'⚡+SIZE'},
+  damage_boost:{cls:'effect-damage_boost',txt:'🔥+DMG'},
+  speed_boost: {cls:'effect-speed_boost', txt:'💨+SPD'},
+  shield:      {cls:'effect-shield',      txt:'🛡SHIELD'}
+};
+function updateEffects(el,effs){
+  const active=Object.entries(effs).filter(([,v])=>v>0).map(([k])=>k);
+  for(const pill of [...el.querySelectorAll('.effect-pill')]){
+    if(!active.includes(pill.dataset.type)) pill.remove();
+  }
+  const have=new Set([...el.querySelectorAll('.effect-pill')].map(e=>e.dataset.type));
+  for(const k of active){
+    if(!have.has(k)&&PILLS[k]){
+      const d=document.createElement('span');
+      d.className=`effect-pill ${PILLS[k].cls}`; d.dataset.type=k; d.textContent=PILLS[k].txt;
+      el.appendChild(d);
     }
   }
-  ctx.shadowBlur = 0;
 }
 
-// ── UI ──
-function updateUI() {
-  const p1 = gameState.player1;
-  const p2 = gameState.player2;
-
-  const hp1pct = Math.max(0, p1.hp / p1.maxHp * 100);
-  const hp2pct = Math.max(0, p2.hp / p2.maxHp * 100);
-  hpBar1.style.width = hp1pct + '%';
-  hpBar2.style.width = hp2pct + '%';
-  hpText1.textContent = `${p1.hp} / ${p1.maxHp}`;
-  hpText2.textContent = `${p2.hp} / ${p2.maxHp}`;
-
-  if (hp1pct < 25)      hpBar1.style.background = 'linear-gradient(90deg, #ff0000, #ff4060)';
-  else if (hp1pct < 50) hpBar1.style.background = 'linear-gradient(90deg, #ff8800, #ffaa00)';
-  else                  hpBar1.style.background = '';
-
-  if (hp2pct < 25)      hpBar2.style.background = 'linear-gradient(90deg, #ff0000, #ff4060)';
-  else if (hp2pct < 50) hpBar2.style.background = 'linear-gradient(90deg, #ff8800, #ffaa00)';
-  else                  hpBar2.style.background = '';
-
-  const t = Math.max(0, gameState.timer);
-  const m = Math.floor(t / 60), s = t % 60;
-  timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-  timerEl.classList.toggle('danger', t <= 30);
-}
-
-// ── Status overlay ──
-function setStatus(icon, msg, sub = '') {
-  statusIcon.textContent    = icon;
-  statusMessage.textContent = msg;
-  statusSub.textContent     = sub;
+function setStatus(icon,msg,sub=''){
+  statusIcon.textContent=icon; statusMessage.textContent=msg; statusSub.textContent=sub;
   statusOverlay.classList.remove('hidden');
 }
-function hideStatus() { statusOverlay.classList.add('hidden'); }
+function hideStatus(){ statusOverlay.classList.add('hidden'); }
 
-// ── Helper colori ──
-function lighten(hex, amt) {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  return `rgb(${Math.min(255,c.r+amt*255)},${Math.min(255,c.g+amt*255)},${Math.min(255,c.b+amt*255)})`;
+function lighten(hex,a){
+  const c=hexToRgb(hex); if(!c) return hex;
+  return `rgb(${Math.min(255,c.r+a*255)|0},${Math.min(255,c.g+a*255)|0},${Math.min(255,c.b+a*255)|0})`;
 }
-function darken(hex, amt) {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  return `rgb(${Math.max(0,c.r-amt*255)},${Math.max(0,c.g-amt*255)},${Math.max(0,c.b-amt*255)})`;
+function darken(hex,a){
+  const c=hexToRgb(hex); if(!c) return hex;
+  return `rgb(${Math.max(0,c.r-a*255)|0},${Math.max(0,c.g-a*255)|0},${Math.max(0,c.b-a*255)|0})`;
 }
-function hexToRgb(hex) {
-  // Supporta anche stringhe rgb(...)
-  if (hex.startsWith('rgb')) return null;
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : null;
+function hexToRgb(hex){
+  if(typeof hex!=='string'||!hex.startsWith('#')) return null;
+  const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r?{r:parseInt(r[1],16),g:parseInt(r[2],16),b:parseInt(r[3],16)}:null;
 }
 
-// ── Controlli ──
-document.addEventListener('keydown', (e) => {
-  if (['a','A','ArrowLeft'].includes(e.key))  keys.left  = true;
-  if (['d','D','ArrowRight'].includes(e.key)) keys.right = true;
-  if (['w','W','ArrowUp'].includes(e.key))    keys.up    = true;
-  if (['s','S','ArrowDown'].includes(e.key))  keys.down  = true;
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+document.addEventListener('keydown',(e)=>{
+  if(['a','A','ArrowLeft'].includes(e.key))  keys.left=true;
+  if(['d','D','ArrowRight'].includes(e.key)) keys.right=true;
+  if(['w','W','ArrowUp'].includes(e.key))    keys.up=true;
+  if(['s','S','ArrowDown'].includes(e.key))  keys.down=true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
 });
-document.addEventListener('keyup', (e) => {
-  if (['a','A','ArrowLeft'].includes(e.key))  keys.left  = false;
-  if (['d','D','ArrowRight'].includes(e.key)) keys.right = false;
-  if (['w','W','ArrowUp'].includes(e.key))    keys.up    = false;
-  if (['s','S','ArrowDown'].includes(e.key))  keys.down  = false;
+document.addEventListener('keyup',(e)=>{
+  if(['a','A','ArrowLeft'].includes(e.key))  keys.left=false;
+  if(['d','D','ArrowRight'].includes(e.key)) keys.right=false;
+  if(['w','W','ArrowUp'].includes(e.key))    keys.up=false;
+  if(['s','S','ArrowDown'].includes(e.key))  keys.down=false;
 });
 
-document.getElementById('forfeitBtn').addEventListener('click', () => {
-  if (confirm('Sicuro di voler abbandonare?')) {
-    ws.send(JSON.stringify({ type: 'forfeit' }));
-  }
+document.getElementById('forfeitBtn').addEventListener('click',()=>{
+  if(confirm('Sicuro di voler abbandonare?')) ws.send(JSON.stringify({type:'forfeit'}));
 });
 
 connect();

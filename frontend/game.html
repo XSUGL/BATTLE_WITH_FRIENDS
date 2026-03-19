@@ -1,54 +1,43 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Battle With Friend — Fight!</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/game.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle With Friend — Fight!</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/game.css">
 </head>
 <body>
   <div class="game-wrapper">
     <div class="game-container">
-
-      <!-- HUD -->
       <div class="game-hud">
         <div class="fighter-hud p1-hud">
           <div class="fighter-avatar p1-avatar" id="p1emoji">⚔️</div>
           <div class="fighter-info">
             <div class="fighter-name" id="p1name">KNIGHT</div>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar p1-hp-bar" id="hpBar1"></div>
-            </div>
+            <div class="hp-bar-wrap"><div class="hp-bar p1-hp-bar" id="hpBar1"></div></div>
             <div class="hp-text" id="hpText1">150 / 150</div>
+            <div class="effects-bar" id="effects1"></div>
           </div>
         </div>
-
         <div class="center-hud">
           <div class="timer-label-small">TIME</div>
           <div class="timer-value" id="timer">3:00</div>
           <div class="vs-badge">VS</div>
         </div>
-
         <div class="fighter-hud p2-hud">
           <div class="fighter-info right">
             <div class="fighter-name" id="p2name">WARRIOR</div>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar p2-hp-bar" id="hpBar2"></div>
-            </div>
+            <div class="hp-bar-wrap"><div class="hp-bar p2-hp-bar" id="hpBar2"></div></div>
             <div class="hp-text" id="hpText2">200 / 200</div>
+            <div class="effects-bar" id="effects2"></div>
           </div>
           <div class="fighter-avatar p2-avatar" id="p2emoji">🔨</div>
         </div>
       </div>
-
-      <!-- Arena -->
       <div class="arena-wrapper">
         <canvas id="gameCanvas" width="800" height="500"></canvas>
       </div>
-
-      <!-- Footer -->
       <div class="game-footer">
         <div class="controls-hint">
           <span class="hint p1">🔵 A/D move &nbsp;W jump</span>
@@ -57,11 +46,8 @@
         </div>
         <button id="forfeitBtn" class="btn-forfeit">⚑ Forfeit</button>
       </div>
-
     </div>
   </div>
-
-  <!-- Status Overlay -->
   <div id="statusOverlay" class="status-overlay">
     <div class="status-card">
       <div class="status-icon" id="statusIcon">⚔️</div>
@@ -70,6 +56,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/game-client.js"></script>
+<script type="module" src="js/game-client.js?v=6"></script>
 </body>
 </html>

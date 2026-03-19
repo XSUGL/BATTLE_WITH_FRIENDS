@@ -1,58 +1,161 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Battle With Friend - Login</title>
-  <link rel="stylesheet" href="css/styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle With Friend</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04080f;--surface:#0b1525;--border:#1e3048;
+  --accent:#00d4ff;--accent2:#ff3d5c;--gold:#ffbe00;--green:#00ff9d;
+  --text:#c4d8f0;--text2:#5a7a99;--text3:#243040;
+}
+html,body{height:100%}
+body{
+  font-family:'Rajdhani',sans-serif;
+  background:var(--bg);color:var(--text);
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;position:relative;overflow:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:radial-gradient(rgba(0,212,255,.13) 1px,transparent 1px);
+  background-size:30px 30px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 30%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 30%,transparent 100%);
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 60% at 10% 5%,rgba(0,212,255,.08),transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 95%,rgba(255,61,92,.07),transparent 55%);
+}
+.container{width:100%;max-width:440px;padding:20px;position:relative;z-index:1}
+.auth-box{
+  background:linear-gradient(145deg,rgba(11,21,37,.97),rgba(4,8,15,.99));
+  border:1px solid var(--border);border-radius:20px;
+  padding:52px 46px 44px;position:relative;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(0,212,255,.06),0 40px 100px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.05);
+}
+.auth-box::before{
+  content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.7),transparent);
+}
+.auth-box::after{
+  content:'';position:absolute;top:0;left:0;width:55px;height:55px;
+  border-top:2px solid rgba(0,212,255,.45);border-left:2px solid rgba(0,212,255,.45);
+  border-radius:20px 0 0 0;
+}
+h1{
+  font-family:'Orbitron',monospace;font-size:17px;font-weight:900;
+  letter-spacing:4px;color:#fff;text-align:center;line-height:1.4;
+  text-shadow:0 0 40px rgba(0,212,255,.55),0 0 80px rgba(0,212,255,.2);
+  margin-bottom:6px;
+}
+.logo-tag{
+  font-family:'Orbitron',monospace;font-size:8px;letter-spacing:5px;
+  color:var(--text2);text-align:center;margin-bottom:36px;display:block;
+}
+h2{
+  font-family:'Orbitron',monospace;font-size:10px;font-weight:700;
+  letter-spacing:4px;color:var(--accent);margin-bottom:28px;text-align:center;
+}
+.form-group{margin-bottom:20px}
+label{
+  display:block;margin-bottom:8px;font-size:9px;letter-spacing:3px;
+  color:var(--text2);font-family:'Orbitron',monospace;text-transform:uppercase;
+}
+input[type=text],input[type=password]{
+  width:100%;padding:14px 18px;
+  background:rgba(4,8,15,.85);border:1px solid var(--border);
+  border-radius:8px;font-size:16px;color:#fff;
+  font-family:'Rajdhani',sans-serif;font-weight:500;
+  transition:border-color .2s,box-shadow .2s;outline:none;
+}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.12)}
+small{display:block;margin-top:5px;color:var(--text3);font-size:11px}
+.btn{
+  width:100%;padding:15px 20px;border:none;border-radius:8px;
+  font-size:10px;font-weight:700;letter-spacing:4px;
+  cursor:pointer;transition:all .22s;
+  font-family:'Orbitron',monospace;text-transform:uppercase;position:relative;overflow:hidden;
+}
+.btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.09),transparent 55%);pointer-events:none;
+}
+.btn-primary{
+  background:linear-gradient(135deg,rgba(0,212,255,.22),rgba(0,150,200,.1));
+  color:var(--accent);border:1px solid rgba(0,212,255,.5);
+  box-shadow:0 0 24px rgba(0,212,255,.12),inset 0 1px 0 rgba(255,255,255,.07);
+}
+.btn-primary:hover{
+  background:linear-gradient(135deg,rgba(0,212,255,.36),rgba(0,180,230,.18));
+  box-shadow:0 0 45px rgba(0,212,255,.35),0 8px 32px rgba(0,0,0,.4);
+  transform:translateY(-2px);
+}
+.btn-secondary{background:rgba(255,255,255,.04);color:var(--text2);border:1px solid var(--border)}
+.btn-secondary:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.error-message{
+  color:var(--accent2);font-size:11px;margin-top:12px;text-align:center;
+  display:none;letter-spacing:1px;font-family:'Orbitron',monospace;
+}
+.error-message.show{display:block}
+.success-message{
+  color:var(--green);font-size:11px;margin-top:12px;text-align:center;
+  display:none;letter-spacing:1px;font-family:'Orbitron',monospace;
+}
+.success-message.show{display:block}
+.switch-form{text-align:center;margin-top:26px;color:var(--text2);font-size:13px}
+.switch-form a{color:var(--accent);text-decoration:none;font-weight:600;transition:color .2s}
+.switch-form a:hover{color:#fff}
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="auth-box">
-      <h1>Battle With Friend</h1>
-      
-      <div id="login-form" class="form-container">
-        <h2>Login</h2>
-        <form id="loginForm">
-          <div class="form-group">
-            <label for="login-username">Username</label>
-            <input type="text" id="login-username" name="username" required>
-          </div>
-          <div class="form-group">
-            <label for="login-password">Password</label>
-            <input type="password" id="login-password" name="password" required>
-          </div>
-          <button type="submit" class="btn btn-primary">Login</button>
-          <div id="login-error" class="error-message"></div>
-        </form>
-        <p class="switch-form">
-          Don't have an account? <a href="#" id="show-register">Register</a>
-        </p>
-      </div>
-      
-      <div id="register-form" class="form-container" style="display: none;">
-        <h2>Register</h2>
-        <form id="registerForm">
-          <div class="form-group">
-            <label for="register-username">Username</label>
-            <input type="text" id="register-username" name="username" required minlength="3" maxlength="50">
-            <small>3-50 characters</small>
-          </div>
-          <div class="form-group">
-            <label for="register-password">Password</label>
-            <input type="password" id="register-password" name="password" required minlength="8">
-            <small>Minimum 8 characters</small>
-          </div>
-          <button type="submit" class="btn btn-primary">Register</button>
-          <div id="register-error" class="error-message"></div>
-        </form>
-        <p class="switch-form">
-          Already have an account? <a href="#" id="show-login">Login</a>
-        </p>
-      </div>
+<div class="container">
+  <div class="auth-box">
+    <h1>⚔ BATTLE<br>WITH FRIEND</h1>
+    <span class="logo-tag">MULTIPLAYER ARENA</span>
+
+    <div id="login-form" class="form-container">
+      <h2>LOGIN</h2>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" name="username" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" name="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">ENTER ARENA</button>
+        <div id="login-error" class="error-message"></div>
+      </form>
+      <p class="switch-form">No account? <a href="#" id="show-register">Register here</a></p>
+    </div>
+
+    <div id="register-form" class="form-container" style="display:none">
+      <h2>REGISTER</h2>
+      <form id="registerForm">
+        <div class="form-group">
+          <label for="register-username">Username</label>
+          <input type="text" id="register-username" name="username" required minlength="3" maxlength="50" autocomplete="username">
+          <small>3–50 characters</small>
+        </div>
+        <div class="form-group">
+          <label for="register-password">Password</label>
+          <input type="password" id="register-password" name="password" required minlength="8" autocomplete="new-password">
+          <small>Minimum 8 characters</small>
+        </div>
+        <button type="submit" class="btn btn-primary">CREATE ACCOUNT</button>
+        <div id="register-error" class="error-message"></div>
+      </form>
+      <p class="switch-form">Have an account? <a href="#" id="show-login">Login here</a></p>
     </div>
   </div>
-  
-  <script type="module" src="js/login.js"></script>
+</div>
+<script type="module" src="js/login.js"></script>
 </body>
 </html>

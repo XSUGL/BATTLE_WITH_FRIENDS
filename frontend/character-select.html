@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Battle With Friend — Choose Your Fighter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/character-select.css">
-  <link rel="stylesheet" href="css/map-select.css">
 </head>
 <body>
 <div class="cs-wrapper">
+
   <h1 class="cs-title">CHOOSE YOUR FIGHTER</h1>
   <p class="cs-sub" id="csStatus">Connecting...</p>
 
   <div class="section-label">CHARACTER</div>
   <div class="classes-grid">
+
     <div class="class-card" data-class="knight">
       <div class="class-icon">⚔️</div>
       <div class="class-name">KNIGHT</div>
@@ -24,8 +25,9 @@
         <div class="stat"><span class="stat-label">SPD</span><div class="stat-bar"><div class="stat-fill" style="width:60%"></div></div><span class="stat-val">4</span></div>
         <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:67%"></div></div><span class="stat-val">20</span></div>
       </div>
-      <div class="class-weapon">1x Spada</div>
+      <div class="class-weapon">1× Sword</div>
     </div>
+
     <div class="class-card" data-class="warrior">
       <div class="class-icon">🔨</div>
       <div class="class-name">WARRIOR</div>
@@ -34,18 +36,20 @@
         <div class="stat"><span class="stat-label">SPD</span><div class="stat-bar"><div class="stat-fill" style="width:35%"></div></div><span class="stat-val">2.8</span></div>
         <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:100%"></div></div><span class="stat-val">30</span></div>
       </div>
-      <div class="class-weapon">1x Mazza</div>
+      <div class="class-weapon">1× Mace</div>
     </div>
+
     <div class="class-card" data-class="reaper">
       <div class="class-icon">🌙</div>
       <div class="class-name">REAPER</div>
       <div class="class-stats">
         <div class="stat"><span class="stat-label">HP</span><div class="stat-bar"><div class="stat-fill" style="width:50%"></div></div><span class="stat-val">100</span></div>
         <div class="stat"><span class="stat-label">SPD</span><div class="stat-bar"><div class="stat-fill" style="width:100%"></div></div><span class="stat-val">5.5</span></div>
-        <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:50%"></div></div><span class="stat-val">15x2</span></div>
+        <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:50%"></div></div><span class="stat-val">15×2</span></div>
       </div>
-      <div class="class-weapon">2x Falce</div>
+      <div class="class-weapon">2× Scythe</div>
     </div>
+
     <div class="class-card" data-class="ranger">
       <div class="class-icon">🏹</div>
       <div class="class-name">RANGER</div>
@@ -54,50 +58,57 @@
         <div class="stat"><span class="stat-label">SPD</span><div class="stat-bar"><div class="stat-fill" style="width:92%"></div></div><span class="stat-val">5</span></div>
         <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:83%"></div></div><span class="stat-val">25</span></div>
       </div>
-      <div class="class-weapon">1x Lancia</div>
+      <div class="class-weapon">1× Spear</div>
     </div>
+
     <div class="class-card" data-class="brawler">
       <div class="class-icon">👊</div>
       <div class="class-name">BRAWLER</div>
       <div class="class-stats">
         <div class="stat"><span class="stat-label">HP</span><div class="stat-bar"><div class="stat-fill" style="width:90%"></div></div><span class="stat-val">180</span></div>
         <div class="stat"><span class="stat-label">SPD</span><div class="stat-bar"><div class="stat-fill" style="width:72%"></div></div><span class="stat-val">3.8</span></div>
-        <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:33%"></div></div><span class="stat-val">10x3</span></div>
+        <div class="stat"><span class="stat-label">DMG</span><div class="stat-bar"><div class="stat-fill" style="width:33%"></div></div><span class="stat-val">10×3</span></div>
       </div>
-      <div class="class-weapon">3x Pugni</div>
+      <div class="class-weapon">3× Fists</div>
     </div>
+
   </div>
 
   <div class="section-label" style="margin-top:32px">VOTE MAP</div>
   <div class="maps-grid">
+
     <div class="map-card" data-map="arena">
       <span class="map-check">✓</span>
       <div class="map-icon">⚔️</div>
       <div class="map-name">ARENA</div>
-      <div class="map-desc">Ground piatto · Gravità normale</div>
+      <div class="map-desc">Flat · 3 wall obstacles · Normal gravity</div>
       <div class="map-votes" id="votes-arena"></div>
     </div>
+
     <div class="map-card" data-map="platforms">
       <span class="map-check">✓</span>
       <div class="map-icon">🏔️</div>
       <div class="map-name">PLATFORMS</div>
-      <div class="map-desc">5 piattaforme · Salti strategici</div>
+      <div class="map-desc">5 platforms · 3 obstacles · High gravity</div>
       <div class="map-votes" id="votes-platforms"></div>
     </div>
+
     <div class="map-card" data-map="space">
       <span class="map-check">✓</span>
       <div class="map-icon">🚀</div>
       <div class="map-name">SPACE</div>
-      <div class="map-desc">Gravità ridotta · Rimbalzi ovunque</div>
+      <div class="map-desc">Low gravity · Asteroid obstacles · Bounce walls</div>
       <div class="map-votes" id="votes-space"></div>
     </div>
+
     <div class="map-card" data-map="volcano">
       <span class="map-check">✓</span>
       <div class="map-icon">🌋</div>
       <div class="map-name">VULCANO</div>
-      <div class="map-desc">Lava che sale · Piattaforme</div>
+      <div class="map-desc">Rising lava · Rock obstacles · 3 platforms</div>
       <div class="map-votes" id="votes-volcano"></div>
     </div>
+
   </div>
 
   <div class="map-decided" id="mapDecided"></div>
@@ -107,6 +118,7 @@
   </div>
 
   <div class="opponent-status" id="opponentStatus"></div>
+
 </div>
 <script type="module" src="js/character-select.js"></script>
 </body>
