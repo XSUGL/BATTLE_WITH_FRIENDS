@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Котик Тойбокс — питомец</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand__mark" aria-hidden="true"></div>
+          <div class="brand__text">
+            <div class="brand__title">TOYBOX CAT</div>
+            <div class="brand__subtitle">игра-питомец без бэкенда</div>
+          </div>
+        </div>
+
+        <div class="topbar__stats">
+          <div class="coins">
+            <span class="coins__icon" aria-hidden="true">🪙</span>
+            <span class="coins__value" id="coins">0</span>
+          </div>
+          <div class="level">
+            <span class="level__label">УРОВЕНЬ</span>
+            <span class="level__value" id="level">1</span>
+            <span class="level__sep" aria-hidden="true">•</span>
+            <span class="level__xp" id="xpText">0 / 100</span>
+          </div>
+          <button class="btn btn--ghost btn--compact" id="btnShare" type="button" aria-label="Поделиться карточкой котика">
+            Поделиться
+          </button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel--left">
+          <h2 class="panel__title">Состояние</h2>
+
+          <div class="stat">
+            <div class="stat__row">
+              <div class="stat__label">ГОЛОД</div>
+              <div class="stat__value" id="hungerText">0</div>
+            </div>
+            <div class="bar">
+              <div class="bar__fill bar__fill--hunger" id="barHunger" style="--p:0%"></div>
+            </div>
+          </div>
+
+          <div class="stat">
+            <div class="stat__row">
+              <div class="stat__label">ЭНЕРГИЯ</div>
+              <div class="stat__value" id="energyText">100</div>
+            </div>
+            <div class="bar">
+              <div class="bar__fill bar__fill--energy" id="barEnergy" style="--p:100%"></div>
+            </div>
+          </div>
+
+          <div class="stat">
+            <div class="stat__row">
+              <div class="stat__label">НАСТРОЕНИЕ</div>
+              <div class="stat__value" id="moodText">100</div>
+            </div>
+            <div class="bar">
+              <div class="bar__fill bar__fill--mood" id="barMood" style="--p:100%"></div>
+            </div>
+          </div>
+
+          <div class="stat">
+            <div class="stat__row">
+              <div class="stat__label">ЧИСТОТА</div>
+              <div class="stat__value" id="cleanText">100</div>
+            </div>
+            <div class="bar">
+              <div class="bar__fill bar__fill--clean" id="barClean" style="--p:100%"></div>
+            </div>
+          </div>
+
+          <div class="mood-chip" id="moodChip" aria-live="polite"></div>
+
+          <div class="quick-actions">
+            <button class="btn btn--primary" id="btnFeed" type="button">Накормить (50)</button>
+            <button class="btn btn--secondary" id="btnWash" type="button">Умыть (30)</button>
+            <button class="btn btn--ghost" id="btnSpin" type="button">Игрушечный спин (15)</button>
+          </div>
+          <div class="hint">
+            Кликни по коту. Погладь мышкой и повторяй действия иногда — он реагирует на бездействие.
+          </div>
+        </section>
+
+        <section class="panel panel--center">
+          <h2 class="panel__title">Питомец</h2>
+
+          <div class="pet-stage" id="petStage">
+            <div class="pet-bg" aria-hidden="true"></div>
+
+            <div class="pet-shadow" aria-hidden="true"></div>
+            <div id="pet" class="cat" role="button" tabindex="0" aria-label="Кот-питомец">
+              <div class="cat__body" aria-hidden="true"></div>
+              <div class="cat__tail" aria-hidden="true"></div>
+
+              <div class="cat__head" aria-hidden="true">
+                <div class="cat__ear cat__ear--l"></div>
+                <div class="cat__ear cat__ear--r"></div>
+
+                <div class="cat__face">
+                  <div class="cat__eye cat__eye--l">
+                    <div class="cat__pupil" id="pupilL"></div>
+                    <div class="cat__shine" aria-hidden="true"></div>
+                  </div>
+                  <div class="cat__eye cat__eye--r">
+                    <div class="cat__pupil" id="pupilR"></div>
+                    <div class="cat__shine" aria-hidden="true"></div>
+                  </div>
+
+                  <div class="cat__nose" aria-hidden="true"></div>
+                  <div class="cat__mouth" aria-hidden="true"></div>
+                </div>
+
+                <div class="cat__cheek cat__cheek--l" aria-hidden="true"></div>
+                <div class="cat__cheek cat__cheek--r" aria-hidden="true"></div>
+
+                <div class="cat__sparkles" aria-hidden="true"></div>
+              </div>
+
+              <div class="cat__paw cat__paw--l" aria-hidden="true"></div>
+              <div class="cat__paw cat__paw--r" aria-hidden="true"></div>
+
+              <div id="equipLayer" class="cat__equip" aria-hidden="true"></div>
+            </div>
+
+            <div id="petHand" class="pet-hand" aria-hidden="true"></div>
+            <div id="toast" class="toast" aria-live="polite"></div>
+          </div>
+
+          <div class="daily">
+            <div class="daily__title">Ежедневный бонус</div>
+            <div class="daily__row">
+              <div class="daily__text" id="dailyText">—</div>
+              <button class="btn btn--gold" id="btnDaily" type="button">Забрать</button>
+            </div>
+            <div class="daily__streak" id="dailyStreakText" aria-live="polite">Серия: 0</div>
+          </div>
+        </section>
+
+        <section class="panel panel--right">
+          <h2 class="panel__title">Игры и магазин</h2>
+
+          <div class="section">
+            <div class="section__title">Мини-игры</div>
+            <div class="game-grid">
+              <button class="game-card" type="button" data-game="flappy">
+                <div class="game-card__title">Flap-ish</div>
+                <div class="game-card__desc">кликни/тапни, лети между блоками</div>
+                <div class="game-card__tag">Canvas</div>
+              </button>
+              <button class="game-card" type="button" data-game="dino">
+                <div class="game-card__title">Turtle Dash</div>
+                <div class="game-card__desc">беги и прыгай, увернись от кактусов</div>
+                <div class="game-card__tag">Runner</div>
+              </button>
+              <button class="game-card" type="button" data-game="climb">
+                <div class="game-card__title">Upward Bounce</div>
+                <div class="game-card__desc">вертикальный прыжковый платформер</div>
+                <div class="game-card__tag">Canvas</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section__title">Прогресс / Разблокировки</div>
+            <div class="unlock">
+              <div class="unlock__row">
+                <span class="unlock__label">Опыт (XP)</span>
+                <span class="unlock__value" id="xpLevelHint">Питомец растёт от взаимодействий и побед в мини-играх.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section__title">Магазин (одежда/аксессуары)</div>
+            <div class="shop">
+              <div class="shop__tabs">
+                <button class="tab tab--active" type="button" data-tab="head">Шапки</button>
+                <button class="tab" type="button" data-tab="eyes">Очки</button>
+                <button class="tab" type="button" data-tab="outfit">Костюмы</button>
+              </div>
+
+              <div class="shop__list" id="shopList"></div>
+            </div>
+          </div>
+
+          <div class="footer-note">
+            Никаких копий Talking Tom. Всё сделано ванильным HTML/CSS/JS (LocalStorage).
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="gameModal" class="modal" aria-hidden="true">
+      <div class="modal__content">
+        <div class="modal__head">
+          <div class="modal__title" id="modalTitle">Мини-игра</div>
+          <button class="icon-btn" id="btnCloseModal" type="button" aria-label="Закрыть">✕</button>
+        </div>
+
+        <div class="modal__body">
+          <canvas id="gameCanvas" width="960" height="520"></canvas>
+          <div class="modal__hud">
+            <div class="modal__hudLine" id="modalHudLine">—</div>
+            <button class="btn btn--primary" id="btnStartGame" type="button">Начать</button>
+            <button class="btn btn--ghost" id="btnBackGame" type="button">Назад</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="shareModal" class="modal" aria-hidden="true">
+      <div class="modal__content modal__content--share">
+        <div class="modal__head">
+          <div class="modal__title">Поделиться котиком</div>
+          <button class="icon-btn" id="btnCloseShare" type="button" aria-label="Закрыть">✕</button>
+        </div>
+
+        <div class="modal__body">
+          <canvas id="shareCanvas" width="900" height="520" aria-label="Карточка для шаринга"></canvas>
+
+          <div class="modal__hud">
+            <div class="modal__hudLine" id="shareMeta">Сгенерируй карточку и скачай PNG.</div>
+            <button class="btn btn--primary" id="btnGenShare" type="button">Сгенерировать</button>
+          </div>
+
+          <div class="modal__hud">
+            <button class="btn btn--gold" id="btnDownloadShare" type="button">Скачать PNG</button>
+            <button class="btn btn--secondary" id="btnCopyShare" type="button">Скопировать текст</button>
+          </div>
+
+          <div class="modal__hud">
+            <button class="btn btn--ghost" id="btnBackShare" type="button">Готово</button>
+          </div>
+
+          <div class="footer-note">
+            Вирусность: делай скрин с текущим настроением кота + отправляй друзьям текстом.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
+

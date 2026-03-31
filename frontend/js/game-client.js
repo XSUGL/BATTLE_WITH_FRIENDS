@@ -55,7 +55,7 @@ function initStars(W,H){
 
 // ─── WebSocket ───
 function connect(){
-  ws = new WebSocket('ws://localhost:3000');
+  ws = new WebSocket('ws://10.13.0.221:3000/api');
   ws.onopen = () => ws.send(JSON.stringify({type:'join_match',matchId,userId:user.id,token}));
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
