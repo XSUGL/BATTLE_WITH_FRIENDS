@@ -53,9 +53,31 @@ function initStars(W,H){
   for(let i=0;i<160;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+.2,a:Math.random()*.85+.15});
 }
 
+// ─── Weapon Images Cache ───
+const weaponImages = {};
+const weaponTypes = ['sword', 'mace', 'scythe', 'spear', 'fist'];
+
+async function loadWeaponImages() {
+  for (const type of weaponTypes) {
+    try {
+      const img = new Image();
+      img.src = `/assets/weapons/${type}.png`;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      weaponImages[type] = img;
+    } catch (e) {
+      console.warn(`Failed to load weapon image: ${type}`);
+    }
+  }
+}
+
 // ─── WebSocket ───
 function connect(){
-  ws = new WebSocket('ws://10.13.0.221:3000/api');
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.hostname}:3002/api`;
+  ws = new WebSocket(wsUrl);
   ws.onopen = () => ws.send(JSON.stringify({type:'join_match',matchId,userId:user.id,token}));
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
@@ -85,6 +107,7 @@ function connect(){
         p2emoji.textContent = gameState.player2.emoji;
         p2name.textContent  = gameState.player2.name.toUpperCase();
         initStars(canvas.width, canvas.height);
+        loadWeaponImages();
         hideStatus();
         startGameLoop();
         break;
@@ -347,60 +370,49 @@ function drawPlayer(p){
 function drawWeapons(p,effs){
   const grow = effs?.weapon_grow>0;
   const sm   = grow ? 1.85 : 1;
+  
   for(const w of p.weapons){
     const ox=p.x+Math.cos(w.currentAngle)*w.orbitRadius;
     const oy=p.y+Math.sin(w.currentAngle)*w.orbitRadius;
     ctx.save();
     ctx.translate(ox,oy);
     ctx.rotate(w.currentAngle+Math.PI/2);
+    
     const gc=grow?'#ffbe00':p.color;
-    ctx.shadowColor=gc; ctx.shadowBlur=grow?24:10;
-    const l=w.length*sm, wd=w.width*sm;
-    switch(w.type){
-      case 'sword':{
-        const sg=ctx.createLinearGradient(0,-l/2,0,l/2);
-        sg.addColorStop(0,'#fff'); sg.addColorStop(.3,gc); sg.addColorStop(1,darken(p.color,.5));
-        ctx.fillStyle=sg;
-        ctx.beginPath(); ctx.moveTo(0,-l/2); ctx.lineTo(wd/2,l/4); ctx.lineTo(0,l/2); ctx.lineTo(-wd/2,l/4); ctx.closePath(); ctx.fill();
-        ctx.fillStyle='#aaa'; ctx.fillRect(-wd*1.2,l/4-3,wd*2.4,5);
-        break;
+    ctx.shadowColor=gc; 
+    ctx.shadowBlur=grow?24:10;
+    
+    // Proportions optimized per weapon type (relative to player radius ~12)
+    const proportions = {
+      sword:  { w: 18, h: 60, ox: 0, oy: 0 },
+      mace:   { w: 32, h: 38, ox: 0, oy: -2 },
+      scythe: { w: 35, h: 65, ox: 8, oy: 0 },
+      spear:  { w: 20, h: 70, ox: 0, oy: -2 },
+      fist:   { w: 28, h: 32, ox: 0, oy: 0 }
+    };
+    
+    const props = proportions[w.type] || { w: 20, h: 50, ox: 0, oy: 0 };
+    const weaponW = props.w * sm;
+    const weaponH = props.h * sm;
+    
+    // Try to draw weapon image, fall back to shapes if not loaded
+    const img = weaponImages[w.type];
+    if(img && img.complete){
+      try {
+        ctx.drawImage(img, props.ox - weaponW/2, props.oy - weaponH/2, weaponW, weaponH);
+      } catch(e) {
+        // Fallback if image fails
+        ctx.fillStyle=gc; 
+        ctx.fillRect(props.ox - weaponW/2, props.oy - weaponH/2, weaponW, weaponH);
       }
-      case 'mace':{
-        ctx.fillStyle='#6b4226'; ctx.fillRect(-2.5,-l/2,5,l*.65);
-        ctx.fillStyle=gc; ctx.beginPath(); ctx.arc(0,-l/2,wd/2+3,0,Math.PI*2); ctx.fill();
-        for(let i=0;i<7;i++){
-          const a=i/7*Math.PI*2;
-          ctx.fillStyle=darken(gc,.15); ctx.beginPath();
-          ctx.moveTo(0,-l/2); ctx.lineTo(Math.cos(a)*(wd/2+10),-l/2+Math.sin(a)*(wd/2+10));
-          ctx.lineTo(Math.cos(a+.5)*(wd/2),-l/2+Math.sin(a+.5)*(wd/2)); ctx.closePath(); ctx.fill();
-        }
-        break;
-      }
-      case 'scythe':{
-        ctx.fillStyle='#444'; ctx.fillRect(-2,-l/2,4,l);
-        ctx.strokeStyle=gc; ctx.lineWidth=wd; ctx.lineCap='round';
-        ctx.beginPath(); ctx.arc(l*.3,-l/2,l*.46,Math.PI*1.1,Math.PI*1.9); ctx.stroke();
-        break;
-      }
-      case 'spear':{
-        ctx.fillStyle='#6b4226'; ctx.fillRect(-2,-l/2+14,4,l-14);
-        const spg=ctx.createLinearGradient(0,-l/2,0,-l/2+22);
-        spg.addColorStop(0,'#fff'); spg.addColorStop(1,gc);
-        ctx.fillStyle=spg; ctx.beginPath();
-        ctx.moveTo(0,-l/2); ctx.lineTo(wd/2,-l/2+22); ctx.lineTo(-wd/2,-l/2+22); ctx.closePath(); ctx.fill();
-        break;
-      }
-      case 'fist':{
-        const fg=ctx.createRadialGradient(0,0,0,0,0,wd/2+3);
-        fg.addColorStop(0,lighten(gc,.35)); fg.addColorStop(1,darken(p.color,.2));
-        ctx.fillStyle=fg; ctx.fillRect(-wd/2,-l/2,wd,l);
-        ctx.fillStyle='rgba(255,255,255,0.28)';
-        for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(-wd/4+i*(wd/3),-l/2+4,2.8,0,Math.PI*2); ctx.fill(); }
-        break;
-      }
-      default:{ ctx.fillStyle=gc; ctx.fillRect(-wd/2,-l/2,wd,l); }
+    } else {
+      // Fallback to old canvas drawing while images load
+      ctx.fillStyle=gc; 
+      ctx.fillRect(props.ox - weaponW/2, props.oy - weaponH/2, weaponW, weaponH);
     }
-    ctx.shadowBlur=0; ctx.restore();
+    
+    ctx.shadowBlur=0; 
+    ctx.restore();
   }
 }
 

@@ -73,7 +73,9 @@ readyBtn.addEventListener('click', () => {
 
 // ── WebSocket ──
 function connect() {
-  ws = new WebSocket('ws://10.13.0.221:3000/api');
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.hostname}:3002/api`;
+  ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token }));
