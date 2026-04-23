@@ -1,4 +1,4 @@
-const API_BASE_URL = window.API_BASE_URL || `${window.location.origin}/api`;
+const API_BASE_URL = window.API_BASE_URL || `${window.location.origin}/webapp2/api`;
 
 async function fetchWithTimeout(url, options = {}, timeout = 10000) {
   const controller = new AbortController();

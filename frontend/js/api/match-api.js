@@ -1,6 +1,6 @@
 import { getToken, logout } from './auth-api.js';
 
-const API_BASE_URL = window.API_BASE_URL || `${window.location.origin}/api`;
+const API_BASE_URL = window.API_BASE_URL || `${window.location.origin}/webapp2/api`;
 
 async function fetchWithAuth(url, options = {}) {
   const token = getToken();

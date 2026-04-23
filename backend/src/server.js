@@ -29,15 +29,22 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files from frontend
+app.use('/webapp2', express.static(frontendPath));
 app.use(express.static(frontendPath));
 
 // Routes
+app.use('/webapp2/api/auth', authRoutes);
+app.use('/webapp2/api/matches', matchesRoutes);
+app.use('/webapp2/api/leaderboard', leaderboardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 
 // Serve index.html for root path (SPA fallback)
 app.get('/', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+app.get('/webapp2', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
