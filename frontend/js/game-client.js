@@ -2,11 +2,11 @@ import { getToken, getUser } from './api/auth-api.js';
 
 const urlParams = new URLSearchParams(window.location.search);
 const matchId   = parseInt(urlParams.get('matchId'));
-if (!matchId) window.location.href = '/dashboard.html';
+if (!matchId) window.location.href = '/webapp2/dashboard.html';
 
 const user  = getUser();
 const token = getToken();
-if (!user || !token) window.location.href = '/index.html';
+if (!user || !token) window.location.href = '/webapp2/index.html';
 
 let ws, playerNumber, gameState = null;
 let currentMapId = 'arena';
@@ -124,7 +124,7 @@ function connect(){
       }
       case 'error':
         alert(msg.message);
-        window.location.href = '/dashboard.html';
+        window.location.href = '/webapp2/dashboard.html';
         break;
     }
   };

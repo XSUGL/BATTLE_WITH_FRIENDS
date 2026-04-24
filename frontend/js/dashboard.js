@@ -25,12 +25,12 @@ import {
 
 // Check authentication
 if (!getToken()) {
-  window.location.href = '/index.html';
+  window.location.href = '/webapp2/index.html';
 }
 
 const user = getUser();
 if (!user) {
-  window.location.href = '/index.html';
+  window.location.href = '/webapp2/index.html';
 }
 
 // DOM elements
@@ -50,7 +50,7 @@ usernameDisplay.textContent = user.username;
 // Logout handler
 logoutBtn.addEventListener('click', () => {
   logout();
-  window.location.href = '/index.html';
+  window.location.href = '/webapp2/index.html';
 });
 
 // Send invitation
@@ -84,7 +84,7 @@ document.addEventListener('click', async (e) => {
       acceptBtn.textContent = 'Connecting...';
       const result = await acceptInvitation(invitationId);
       const matchId = result.id || result.match?.id;
-      window.location.href = `/character-select.html?matchId=${matchId}`;
+      window.location.href = `/webapp2/character-select.html?matchId=${matchId}`;
     } catch (error) {
       alert('Failed to accept invitation: ' + error.message);
       acceptBtn.disabled = false;
@@ -105,7 +105,7 @@ function startActiveMatchPolling() {
       const match = await getActiveMatch();
       if (match && match.id) {
         clearInterval(activeMatchPollingInterval);
-        window.location.href = `/character-select.html?matchId=${match.id}`;
+        window.location.href = `/webapp2/character-select.html?matchId=${match.id}`;
       }
     } catch (e) {
       // ignora errori di rete silenziosi

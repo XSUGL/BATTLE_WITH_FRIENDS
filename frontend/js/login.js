@@ -2,7 +2,7 @@ import { register, login, saveToken, saveUser, getToken } from './api/auth-api.j
 
 // Check if already logged in
 if (getToken()) {
-  window.location.href = '/dashboard.html';
+  window.location.href = '/webapp2/dashboard.html';
 }
 
 const loginForm = document.getElementById('loginForm');
@@ -45,7 +45,7 @@ loginForm.addEventListener('submit', async (e) => {
     saveToken(response.token);
     saveUser(response.user);
     
-    window.location.href = '/dashboard.html';
+    window.location.href = '/webapp2/dashboard.html';
   } catch (error) {
     loginError.textContent = error.message;
     loginError.classList.add('show');
@@ -66,7 +66,7 @@ registerForm.addEventListener('submit', async (e) => {
     saveToken(response.token);
     saveUser(response.user);
     
-    window.location.href = '/dashboard.html';
+    window.location.href = '/webapp2/dashboard.html';
   } catch (error) {
     registerError.textContent = error.message;
     registerError.classList.add('show');

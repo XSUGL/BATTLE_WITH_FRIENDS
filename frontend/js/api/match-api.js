@@ -21,7 +21,7 @@ async function fetchWithAuth(url, options = {}) {
   if (response.status === 401) {
     // Token expired or invalid - clear storage before redirecting
     logout();
-    window.location.href = '/index.html';
+    window.location.href = '/webapp2/index.html';
     throw new Error('Authentication required');
   }
   
