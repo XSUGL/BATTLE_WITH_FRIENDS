@@ -74,7 +74,7 @@ readyBtn.addEventListener('click', () => {
 // ── WebSocket ──
 function connect() {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.hostname}:3002/api`;
+  const wsUrl = `${wsProtocol}//${window.location.host}/webapp2/ws`;
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {

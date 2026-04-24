@@ -76,7 +76,7 @@ async function loadWeaponImages() {
 // ─── WebSocket ───
 function connect(){
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.hostname}:3002/api`;
+  const wsUrl = `${wsProtocol}//${window.location.host}/webapp2/ws`;
   ws = new WebSocket(wsUrl);
   ws.onopen = () => ws.send(JSON.stringify({type:'join_match',matchId,userId:user.id,token}));
   ws.onmessage = (event) => {
@@ -119,7 +119,7 @@ function connect(){
         const won = playerNumber === msg.winner;
         statusMessage.className = 'status-message';
         setStatus(won?'🏆':'💀', won?'VICTORY!':'DEFEAT', 'Returning to dashboard...');
-        setTimeout(()=>window.location.href='/dashboard.html', 4000);
+        setTimeout(()=>window.location.href='/webapp2/dashboard.html', 4000);
         break;
       }
       case 'error':
