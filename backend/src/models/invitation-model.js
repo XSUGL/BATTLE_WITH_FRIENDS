@@ -40,20 +40,25 @@ export async function createInvitation(inviterId, inviteeId) {
       throw new ConflictError('A pending invitation already exists between these users');
     }
 
-    const expiresAt = new Date(Date.now() + 3 * 60 * 1000); // Scade in 3 minuti
-
     const [result] = await conn.execute(
-      'INSERT INTO invitations (inviter_id, invitee_id, status, expires_at) VALUES (?, ?, "pending", ?)',
-      [inviterId, inviteeId, expiresAt]
+      `INSERT INTO invitations (inviter_id, invitee_id, status, expires_at)
+       VALUES (?, ?, "pending", DATE_ADD(NOW(), INTERVAL 3 MINUTE))`,
+      [inviterId, inviteeId]
     );
+
+    const [insertedRows] = await conn.execute(
+      'SELECT created_at, expires_at FROM invitations WHERE id = ?',
+      [result.insertId]
+    );
+    const inserted = (Array.isArray(insertedRows) && Array.isArray(insertedRows[0])) ? insertedRows[0][0] : insertedRows[0];
     
     return {
       id: Number(result.insertId),
       inviterId,
       inviteeId,
       status: 'pending',
-      expiresAt: expiresAt.toISOString(),
-      createdAt: new Date().toISOString()
+      expiresAt: inserted?.expires_at ? new Date(inserted.expires_at).toISOString() : null,
+      createdAt: inserted?.created_at ? new Date(inserted.created_at).toISOString() : null
     };
   } finally {
     conn.release();
