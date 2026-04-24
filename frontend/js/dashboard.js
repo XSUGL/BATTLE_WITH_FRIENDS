@@ -64,6 +64,7 @@ inviteForm.addEventListener('submit', async (e) => {
     inviteSuccess.textContent = 'Invitation sent successfully!';
     inviteSuccess.classList.add('show');
     inviteUsername.value = '';
+    startActiveMatchPolling();
     setTimeout(() => { inviteSuccess.classList.remove('show'); }, 3000);
     loadInvitations();
   } catch (error) {
@@ -97,6 +98,7 @@ document.addEventListener('click', async (e) => {
 // Polling per Player 1 (invitante)
 // ==========================================
 let activeMatchPollingInterval = null;
+let activeMatchPollingTimeout = null;
 
 function startActiveMatchPolling() {
   if (activeMatchPollingInterval) return;
@@ -105,12 +107,22 @@ function startActiveMatchPolling() {
       const match = await getActiveMatch();
       if (match && match.id) {
         clearInterval(activeMatchPollingInterval);
+        clearTimeout(activeMatchPollingTimeout);
+        activeMatchPollingInterval = null;
+        activeMatchPollingTimeout = null;
         window.location.href = `/webapp2/character-select.html?matchId=${match.id}`;
       }
     } catch (e) {
       // ignora errori di rete silenziosi
     }
   }, 2000);
+
+  // Evita polling infinito se l'invito non viene accettato.
+  activeMatchPollingTimeout = setTimeout(() => {
+    clearInterval(activeMatchPollingInterval);
+    activeMatchPollingInterval = null;
+    activeMatchPollingTimeout = null;
+  }, 3 * 60 * 1000);
 }
 
 // Load active invitations
@@ -156,7 +168,6 @@ async function loadMatchHistory() {
 loadInvitations();
 loadLeaderboard();
 loadMatchHistory();
-startActiveMatchPolling();
 
 // Auto-refresh ogni 10 secondi
 setInterval(() => {
