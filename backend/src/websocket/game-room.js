@@ -1,6 +1,6 @@
 import { GameState, CLASSES, MAPS } from '../game/game-state.js';
 import pool from '../utils/db.js';
-import { updateMatchStatus, completeMatch } from '../models/match-model.js';
+import { updateMatchStatus, completeMatch, findMatchById } from '../models/match-model.js';
 import { saveMatchResults } from '../models/score-model.js';
 
 export class GameRoom {
@@ -18,19 +18,46 @@ export class GameRoom {
     this.gameReadyPlayers = new Set();
     // Voti mappa: { p1: 'arena', p2: 'space' }
     this.mapVotes = {};
+    // Ruoli letti dal DB: { p1: <user_id>, p2: <user_id> }
+    this.roles = null;
+  }
+
+  async loadRoles() {
+    if (this.roles) return this.roles;
+    const m = await findMatchById(this.matchId);
+    if (m) {
+      this.roles = { p1: m.player1_id, p2: m.player2_id };
+    }
+    return this.roles;
   }
 
   async addPlayer(ws, userId) {
-    if (!this.player1) {
-      this.player1 = { ws, userId, input: { up: false, down: false, left: false, right: false }, class: 'knight' };
-      return 1;
-    } else if (!this.player2) {
-      this.player2 = { ws, userId, input: { up: false, down: false, left: false, right: false }, class: 'warrior' };
-      return 2;
-    } else {
-      ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+    const roles = await this.loadRoles();
+    if (!roles) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Match not found' }));
       return null;
     }
+
+    if (userId === roles.p1) {
+      if (this.player1) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Player1 slot busy' }));
+        return null;
+      }
+      this.player1 = { ws, userId, input: { up: false, down: false, left: false, right: false }, class: 'knight' };
+      return 1;
+    }
+
+    if (userId === roles.p2) {
+      if (this.player2) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Player2 slot busy' }));
+        return null;
+      }
+      this.player2 = { ws, userId, input: { up: false, down: false, left: false, right: false }, class: 'warrior' };
+      return 2;
+    }
+
+    ws.send(JSON.stringify({ type: 'error', message: 'You are not part of this match' }));
+    return null;
   }
 
   setPlayerClass(playerNumber, className) {

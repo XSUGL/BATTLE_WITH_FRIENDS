@@ -108,7 +108,10 @@ export async function createMatch(invitationId, player1Id, player2Id, conn = nul
 }
 
 // FIX: cerca sia 'pending' che 'active' così Player 1 viene rediretto
-// subito quando Player 2 accetta (match parte come pending)
+// subito quando Player 2 accetta (match parte come pending).
+// Limita ai match creati negli ultimi 10 minuti per evitare di tornare
+// match vecchi rimasti appesi (es. test interrotti, crash) che farebbero
+// finire i due client su matchId diversi.
 export async function findActiveMatchForUser(userId, conn = null) {
   const connection = conn || await pool.getConnection();
   const shouldRelease = !conn;
@@ -118,6 +121,7 @@ export async function findActiveMatchForUser(userId, conn = null) {
        FROM matches
        WHERE status IN ('pending', 'active')
          AND (player1_id = ? OR player2_id = ?)
+         AND created_at > (NOW() - INTERVAL 10 MINUTE)
        ORDER BY created_at DESC
        LIMIT 1`,
       [userId, userId]
