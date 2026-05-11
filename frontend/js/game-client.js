@@ -61,7 +61,7 @@ async function loadWeaponImages() {
   for (const type of weaponTypes) {
     try {
       const img = new Image();
-      img.src = `/assets/weapons/${type}.png`;
+      img.src = `/webapp2/assets/weapons/${type}.png`;
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
