@@ -11,6 +11,11 @@ if (!user || !token) window.location.href = '/webapp2/index.html';
 let ws, playerNumber, gameState = null;
 let currentMapId = 'arena';
 let savedMapGeo  = { platforms:[], obstacles:[], hasGround:true, groundY:460 };
+let gameOver = false;
+// Timer ID per cleanup
+let renderIntervalId = null;
+let inputIntervalId = null;
+let heartbeatIntervalId = null;
 
 const canvas        = document.getElementById('gameCanvas');
 const ctx           = canvas.getContext('2d');
@@ -116,9 +121,15 @@ function connect(){
         currentMapId = msg.state.mapId || currentMapId;
         break;
       case 'game_over': {
+        if (gameOver) break; // ignora duplicati
+        gameOver = true;
+        // Ferma TUTTI gli intervalli per evitare timer fantasma
+        stopAllIntervals();
         const won = playerNumber === msg.winner;
         statusMessage.className = 'status-message';
         setStatus(won?'🏆':'💀', won?'VICTORY!':'DEFEAT', 'Returning to dashboard...');
+        // Chiudi esplicitamente il WS prima del redirect
+        try { ws?.close(); } catch {}
         setTimeout(()=>window.location.href='/webapp2/dashboard.html', 4000);
         break;
       }
@@ -135,10 +146,25 @@ function connect(){
 
 // ─── Game Loop ───
 function startGameLoop(){
-  setInterval(()=>{ if(gameState){ render(); updateUI(); } }, 1000/60);
-  setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'input',keys})); }, 50);
-  setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'heartbeat'})); }, 5000);
+  // Sicurezza: se startGameLoop venisse richiamato (es. game_start duplicato),
+  // pulisci eventuali timer precedenti prima di crearne di nuovi
+  stopAllIntervals();
+  renderIntervalId    = setInterval(()=>{ if(gameState && !gameOver){ render(); updateUI(); } }, 1000/60);
+  inputIntervalId     = setInterval(()=>{ if(!gameOver && ws?.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'input',keys})); }, 50);
+  heartbeatIntervalId = setInterval(()=>{ if(ws?.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'heartbeat'})); }, 5000);
 }
+
+function stopAllIntervals(){
+  if (renderIntervalId)    { clearInterval(renderIntervalId);    renderIntervalId = null; }
+  if (inputIntervalId)     { clearInterval(inputIntervalId);     inputIntervalId = null; }
+  if (heartbeatIntervalId) { clearInterval(heartbeatIntervalId); heartbeatIntervalId = null; }
+}
+
+// Pulizia su unload (es. utente che chiude o naviga via)
+window.addEventListener('beforeunload', () => {
+  stopAllIntervals();
+  try { ws?.close(); } catch {}
+});
 
 // ─── RENDER ───
 function render(){

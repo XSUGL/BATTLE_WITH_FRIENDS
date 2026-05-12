@@ -46,14 +46,29 @@ async function handleJoinMatch(ws, message) {
   }
 
   let room = rooms.get(matchId);
-  if (!room) { room = new GameRoom(matchId); rooms.set(matchId, room); }
+  if (!room) {
+    // Passa callback di cleanup: la room si auto-elimina dal Map a fine partita
+    room = new GameRoom(matchId, (id) => rooms.delete(id));
+    rooms.set(matchId, room);
+  }
+
+  // Se la room esiste ma è già finita, NON ammettere nessuno: si stava
+  // probabilmente cercando di rientrare in un match già concluso.
+  // Senza questo check, il client riceverebbe 'joined' e stato vecchio.
+  if (room.status === 'ended') {
+    ws.send(JSON.stringify({ type: 'error', message: 'Match already ended' }));
+    return;
+  }
 
   // Rejoin: aggiorna solo il WS se userId già presente
   let playerNumber = null;
   if (room.player1?.userId === userId) {
+    // Chiudi eventuale WS precedente per evitare due socket attivi sullo stesso slot
+    try { if (room.player1.ws && room.player1.ws !== ws && room.player1.ws.readyState === 1) room.player1.ws.close(); } catch {}
     room.player1.ws = ws;
     playerNumber = 1;
   } else if (room.player2?.userId === userId) {
+    try { if (room.player2.ws && room.player2.ws !== ws && room.player2.ws.readyState === 1) room.player2.ws.close(); } catch {}
     room.player2.ws = ws;
     playerNumber = 2;
   } else {
@@ -75,14 +90,27 @@ async function handleJoinMatch(ws, message) {
     ws.send(JSON.stringify({
       type: 'game_start',
       initialState: room.gameState.toJSON(),
-      classes: { p1: room.class1, p2: room.class2 }
+      classes: { p1: room.class1, p2: room.class2 },
+      mapId: room.mapId
     }));
     return;
   }
 
-  if (room.status === 'ended') {
-    ws.send(JSON.stringify({ type: 'error', message: 'Match already ended' }));
-    return;
+  // Se sto entrando in una room dove l'avversario era già presente e
+  // aveva già fatto delle scelte (classe, voto mappa), inviamele subito
+  // così la UI del nuovo arrivato non resta "vuota"
+  const opponentNumber = playerNumber === 1 ? 2 : 1;
+  const opponent = playerNumber === 1 ? room.player2 : room.player1;
+  if (opponent) {
+    if (opponent.class) {
+      ws.send(JSON.stringify({ type: 'class_selected', playerNumber: opponentNumber, className: opponent.class }));
+    }
+    if (Object.keys(room.mapVotes).length > 0) {
+      ws.send(JSON.stringify({ type: 'map_voted', playerNumber: opponentNumber, mapId: room.mapVotes[`p${opponentNumber}`], votes: room.mapVotes }));
+    }
+    if (room.readyPlayers.has(opponentNumber)) {
+      ws.send(JSON.stringify({ type: 'player_ready', playerNumber: opponentNumber, readyCount: room.readyPlayers.size }));
+    }
   }
 
   if (room.isFull()) {
@@ -127,7 +155,14 @@ function handleForfeit(ws) {
 
 function handleDisconnect(ws) {
   const room = rooms.get(ws.matchId);
-  if (room) room.playerDisconnected(ws.playerNumber);
+  if (!room) return;
+  // Se il ws che si chiude è già stato sostituito da un rejoin con un nuovo
+  // WebSocket (caso transizione character-select → game.html), NON marcare
+  // il giocatore come disconnesso: il nuovo WS è ancora attivo.
+  const isStillCurrentP1 = room.player1?.ws === ws;
+  const isStillCurrentP2 = room.player2?.ws === ws;
+  if (!isStillCurrentP1 && !isStillCurrentP2) return;
+  room.playerDisconnected(ws.playerNumber);
 }
 
 setInterval(() => {

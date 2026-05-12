@@ -12,6 +12,9 @@ let ws, playerNumber;
 let selectedClass = null;
 let selectedMap   = null;
 let iAmReady      = false;
+let heartbeatIntervalId = null;
+let reconnectAttempts = 0;
+let intentionalClose = false;
 
 const csStatus       = document.getElementById('csStatus');
 const opponentStatus = document.getElementById('opponentStatus');
@@ -75,10 +78,23 @@ readyBtn.addEventListener('click', () => {
 function connect() {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/webapp2/ws`;
+
+  // Cleanup eventuale connessione precedente
+  if (ws) {
+    try { ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; } catch {}
+    try { ws.close(); } catch {}
+  }
+
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
+    reconnectAttempts = 0;
+    csStatus.textContent = 'Connecting to match...';
     ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token }));
+  };
+
+  ws.onerror = () => {
+    csStatus.textContent = 'Connection error, retrying...';
   };
 
   ws.onmessage = (event) => {
@@ -125,22 +141,57 @@ function connect() {
         break;
 
       case 'game_start':
+        intentionalClose = true;
+        stopHeartbeat();
+        try { ws.close(); } catch {}
         window.location.href = `/webapp2/game.html?matchId=${matchId}`;
         break;
 
       case 'error':
+        intentionalClose = true;
+        stopHeartbeat();
+        try { ws.close(); } catch {}
         alert(msg.message);
         window.location.href = '/webapp2/dashboard.html';
         break;
     }
   };
 
-  ws.onclose = () => { csStatus.textContent = 'Connection lost...'; };
+  ws.onclose = () => {
+    stopHeartbeat();
+    if (intentionalClose) return;
+    // Riconnessione automatica con backoff (max 5 tentativi)
+    if (reconnectAttempts < 5) {
+      reconnectAttempts++;
+      csStatus.textContent = `Connection lost — retry ${reconnectAttempts}/5...`;
+      setTimeout(connect, 800 * reconnectAttempts);
+    } else {
+      csStatus.textContent = 'Connection lost — please reload the page.';
+    }
+  };
 
-  setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN)
+  startHeartbeat();
+}
+
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatIntervalId = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN)
       ws.send(JSON.stringify({ type: 'heartbeat' }));
   }, 5000);
 }
+
+function stopHeartbeat() {
+  if (heartbeatIntervalId) {
+    clearInterval(heartbeatIntervalId);
+    heartbeatIntervalId = null;
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  intentionalClose = true;
+  stopHeartbeat();
+  try { ws?.close(); } catch {}
+});
 
 connect();

@@ -4,7 +4,7 @@ import { updateMatchStatus, completeMatch, findMatchById } from '../models/match
 import { saveMatchResults } from '../models/score-model.js';
 
 export class GameRoom {
-  constructor(matchId) {
+  constructor(matchId, onCleanup = null) {
     this.matchId = matchId;
     this.player1 = null;
     this.player2 = null;
@@ -20,6 +20,9 @@ export class GameRoom {
     this.mapVotes = {};
     // Ruoli letti dal DB: { p1: <user_id>, p2: <user_id> }
     this.roles = null;
+    // Callback invocato per rimuovere la room dal Map quando finita
+    this._onCleanup = onCleanup;
+    this._cleanupScheduled = false;
   }
 
   async loadRoles() {
@@ -147,25 +150,61 @@ export class GameRoom {
   async endGame(winnerNumber, reason) {
     if (this.status === 'ended') return;
     clearInterval(this.gameLoopInterval);
+    this.gameLoopInterval = null;
     this.status = 'ended';
-    const winnerId = winnerNumber === 1 ? this.player1.userId : this.player2.userId;
-    const loserId  = winnerNumber === 1 ? this.player2.userId : this.player1.userId;
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      await completeMatch(this.matchId, winnerId, conn);
-      await saveMatchResults(this.matchId, winnerId, loserId, conn);
-      await conn.commit();
-    } catch (e) {
-      await conn.rollback();
-      console.error('endGame DB error:', e);
-    } finally {
-      conn.release();
+    const winnerId = winnerNumber === 1 ? this.player1?.userId : this.player2?.userId;
+    const loserId  = winnerNumber === 1 ? this.player2?.userId : this.player1?.userId;
+
+    if (winnerId && loserId) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await completeMatch(this.matchId, winnerId, conn);
+        await saveMatchResults(this.matchId, winnerId, loserId, conn);
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        console.error('endGame DB error:', e);
+      } finally {
+        conn.release();
+      }
     }
+
     this.broadcast({
       type: 'game_over', winner: winnerNumber, reason,
-      finalHp: { player1: this.gameState.player1.hp, player2: this.gameState.player2.hp }
+      finalHp: {
+        player1: this.gameState?.player1?.hp ?? 0,
+        player2: this.gameState?.player2?.hp ?? 0
+      }
     });
+
+    // Pulisci la room dal Map dopo che i client hanno avuto il tempo
+    // di ricevere game_over e fare il redirect alla dashboard.
+    // Senza questo, vecchie room restano in memoria e possono confondere
+    // join successivi sulla stessa partita (state pollution).
+    this._scheduleCleanup(8000);
+  }
+
+  _scheduleCleanup(delayMs = 5000) {
+    if (this._cleanupScheduled) return;
+    this._cleanupScheduled = true;
+    setTimeout(() => {
+      try {
+        if (this.gameLoopInterval) {
+          clearInterval(this.gameLoopInterval);
+          this.gameLoopInterval = null;
+        }
+        // Chiudi eventuali WS ancora aperti per liberare risorse
+        try { if (this.player1?.ws?.readyState === 1) this.player1.ws.close(); } catch {}
+        try { if (this.player2?.ws?.readyState === 1) this.player2.ws.close(); } catch {}
+        this.player1 = null;
+        this.player2 = null;
+        this.gameState = null;
+        if (typeof this._onCleanup === 'function') this._onCleanup(this.matchId);
+      } catch (e) {
+        console.error('Room cleanup error:', e);
+      }
+    }, delayMs);
   }
 
   forfeit(playerNumber) { this.endGame(playerNumber === 1 ? 2 : 1, 'forfeit'); }
@@ -180,14 +219,25 @@ export class GameRoom {
 
   broadcast(message) {
     const data = JSON.stringify(message);
-    if (this.player1?.ws.readyState === 1) this.player1.ws.send(data);
-    if (this.player2?.ws.readyState === 1) this.player2.ws.send(data);
+    try { if (this.player1?.ws?.readyState === 1) this.player1.ws.send(data); } catch (e) { console.warn('broadcast p1 failed:', e?.message); }
+    try { if (this.player2?.ws?.readyState === 1) this.player2.ws.send(data); } catch (e) { console.warn('broadcast p2 failed:', e?.message); }
   }
 
   isInactive(now) {
     const timeout = 5 * 60 * 1000;
-    if (!this.player1?.ws.lastHeartbeat || !this.player2?.ws.lastHeartbeat) return false;
-    return (now - this.player1.ws.lastHeartbeat > timeout) || (now - this.player2.ws.lastHeartbeat > timeout);
+    // Room conclusa: cleanup veloce (di solito gestito da _scheduleCleanup,
+    // ma fallback se qualcosa è andato storto)
+    if (this.status === 'ended') return true;
+    // Nessun player presente — la room è orfana
+    if (!this.player1 && !this.player2) return true;
+    // Recupera heartbeat in modo null-safe
+    const hb1 = this.player1?.ws?.lastHeartbeat ?? null;
+    const hb2 = this.player2?.ws?.lastHeartbeat ?? null;
+    // Stale = nessun heartbeat ricevuto o heartbeat troppo vecchio
+    const stale1 = !this.player1 || hb1 === null || (now - hb1 > timeout);
+    const stale2 = !this.player2 || hb2 === null || (now - hb2 > timeout);
+    // Considera inattiva solo se ENTRAMBI gli slot sono stale
+    return stale1 && stale2;
   }
 
   sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
