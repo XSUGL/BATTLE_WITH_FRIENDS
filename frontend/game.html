@@ -37,6 +37,16 @@
       </div>
       <div class="arena-wrapper">
         <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <!-- Touch controls — visibili solo su schermi touch / mobile -->
+        <div class="touch-controls" id="touchControls" aria-hidden="true">
+          <div class="touch-dpad">
+            <button class="touch-btn touch-left"  id="btnLeft"  aria-label="Move left">◀</button>
+            <button class="touch-btn touch-right" id="btnRight" aria-label="Move right">▶</button>
+          </div>
+          <div class="touch-actions">
+            <button class="touch-btn touch-jump" id="btnJump" aria-label="Jump">▲</button>
+          </div>
+        </div>
       </div>
       <div class="game-footer">
         <div class="controls-hint">

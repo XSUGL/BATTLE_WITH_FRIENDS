@@ -126,8 +126,15 @@ function connect(){
         // Ferma TUTTI gli intervalli per evitare timer fantasma
         stopAllIntervals();
         const won = playerNumber === msg.winner;
-        statusMessage.className = 'status-message';
-        setStatus(won?'🏆':'💀', won?'VICTORY!':'DEFEAT', 'Returning to dashboard...');
+        // Vignette + shake forte + haptic burst per drammatizzare la fine
+        applyEndgameVignette();
+        triggerShake(2);
+        haptic(won ? [40,30,40,30,80] : 80);
+        // Piccolo delay prima dell'overlay per percepire l'impatto finale
+        setTimeout(() => {
+          statusMessage.className = 'status-message';
+          setStatus(won?'🏆':'💀', won?'VICTORY!':'DEFEAT', 'Returning to dashboard...');
+        }, 350);
         // Chiudi esplicitamente il WS prima del redirect
         try { ws?.close(); } catch {}
         setTimeout(()=>window.location.href='/webapp2/dashboard.html', 4000);
@@ -517,5 +524,178 @@ document.addEventListener('keyup',(e)=>{
 document.getElementById('forfeitBtn').addEventListener('click',()=>{
   if(confirm('Sicuro di voler abbandonare?')) ws.send(JSON.stringify({type:'forfeit'}));
 });
+
+// ─── TOUCH CONTROLS ───
+function bindTouchButton(btnId, key){
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  const press = (e) => {
+    e.preventDefault();
+    keys[key] = true;
+    btn.classList.add('pressed');
+  };
+  const release = (e) => {
+    e.preventDefault();
+    keys[key] = false;
+    btn.classList.remove('pressed');
+  };
+  btn.addEventListener('touchstart', press,   { passive: false });
+  btn.addEventListener('touchend',   release, { passive: false });
+  btn.addEventListener('touchcancel',release, { passive: false });
+  // Fallback per device misti (es. tablet con mouse)
+  btn.addEventListener('mousedown',  press);
+  btn.addEventListener('mouseup',    release);
+  btn.addEventListener('mouseleave', release);
+}
+
+bindTouchButton('btnLeft',  'left');
+bindTouchButton('btnRight', 'right');
+bindTouchButton('btnJump',  'up');
+
+// Previene zoom su doppio tap sui pulsanti
+document.querySelectorAll('.touch-btn').forEach(btn => {
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
+});
+
+// ─── SCREEN SHAKE / HIT FLASH / DAMAGE POPUPS (graphics polish) ───
+const arenaWrap = document.querySelector('.arena-wrapper');
+let prevHp1 = null, prevHp2 = null;
+let prevPowerupIds = new Set();
+let wasCritical1 = false, wasCritical2 = false;
+
+function triggerShake(intensity = 1){
+  if (!arenaWrap) return;
+  arenaWrap.classList.remove('shake-1','shake-2');
+  void arenaWrap.offsetWidth;
+  arenaWrap.classList.add(intensity >= 2 ? 'shake-2' : 'shake-1');
+  setTimeout(() => arenaWrap.classList.remove('shake-1','shake-2'), 280);
+}
+
+function triggerFlash(){
+  if (!arenaWrap) return;
+  arenaWrap.classList.add('flash');
+  setTimeout(() => arenaWrap.classList.remove('flash'), 90);
+}
+
+// Vibrazione tattile sul mobile (silenziosa su desktop)
+function haptic(ms = 15){
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
+}
+
+// Damage popup floating sopra il player colpito
+function spawnDamagePopup(canvasX, canvasY, dmg, color){
+  if (!arenaWrap || !canvas) return;
+  // Converti coord canvas (logiche 800x500) in coord CSS dell'arena-wrapper
+  const rect = canvas.getBoundingClientRect();
+  const wrapRect = arenaWrap.getBoundingClientRect();
+  const scaleX = rect.width  / canvas.width;
+  const scaleY = rect.height / canvas.height;
+  const cssX = (rect.left - wrapRect.left) + canvasX * scaleX;
+  const cssY = (rect.top  - wrapRect.top)  + canvasY * scaleY;
+
+  const el = document.createElement('div');
+  el.className = 'damage-popup' + (dmg >= 25 ? ' crit' : '');
+  el.style.left = `${cssX}px`;
+  el.style.top  = `${cssY - 20}px`;
+  el.style.color = color;
+  el.textContent = `-${Math.round(dmg)}`;
+  arenaWrap.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
+
+// Burst on power-up pickup
+function spawnPickupBurst(canvasX, canvasY, color){
+  if (!arenaWrap || !canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const wrapRect = arenaWrap.getBoundingClientRect();
+  const scaleX = rect.width  / canvas.width;
+  const scaleY = rect.height / canvas.height;
+  const cssX = (rect.left - wrapRect.left) + canvasX * scaleX;
+  const cssY = (rect.top  - wrapRect.top)  + canvasY * scaleY;
+  const el = document.createElement('div');
+  el.className = 'pickup-burst';
+  el.style.left = `${cssX}px`;
+  el.style.top  = `${cssY}px`;
+  el.style.background = `radial-gradient(circle, ${color}cc 0%, ${color}00 70%)`;
+  el.style.boxShadow = `0 0 24px ${color}`;
+  arenaWrap.appendChild(el);
+  setTimeout(() => el.remove(), 600);
+}
+
+// Hook nel render loop: detect damage, criticals, pickup events
+function checkDamageEffects(){
+  if (!gameState) return;
+  const p1 = gameState.player1, p2 = gameState.player2;
+  const hp1 = p1?.hp, hp2 = p2?.hp;
+  const maxHp1 = p1?.maxHp || 1, maxHp2 = p2?.maxHp || 1;
+
+  // ── Damage events ──
+  if (prevHp1 !== null && hp1 < prevHp1) {
+    const dmg = prevHp1 - hp1;
+    triggerShake(dmg > 15 ? 2 : 1);
+    if (playerNumber === 1) { triggerFlash(); haptic(dmg > 15 ? 30 : 12); }
+    spawnDamagePopup(p1.x, p1.y - p1.radius, dmg, '#ff6680');
+  }
+  if (prevHp2 !== null && hp2 < prevHp2) {
+    const dmg = prevHp2 - hp2;
+    triggerShake(dmg > 15 ? 2 : 1);
+    if (playerNumber === 2) { triggerFlash(); haptic(dmg > 15 ? 30 : 12); }
+    spawnDamagePopup(p2.x, p2.y - p2.radius, dmg, '#80e0ff');
+  }
+
+  // ── Low-HP critical state (per il giocatore locale) ──
+  const myHp    = playerNumber === 1 ? hp1 : hp2;
+  const myMaxHp = playerNumber === 1 ? maxHp1 : maxHp2;
+  const myCritical = myHp > 0 && (myHp / myMaxHp) < 0.25;
+  if (myCritical && !arenaWrap.classList.contains('critical')) {
+    arenaWrap.classList.add('critical');
+  } else if (!myCritical && arenaWrap.classList.contains('critical')) {
+    arenaWrap.classList.remove('critical');
+  }
+
+  // Animation shake su HP bar quando colpito + glow critical
+  const setHpCritical = (wrap, bar, isCrit, justHit) => {
+    if (!wrap || !bar) return;
+    if (isCrit) wrap.classList.add('critical'); else wrap.classList.remove('critical');
+    if (justHit) {
+      bar.classList.remove('low');
+      void bar.offsetWidth;
+      bar.classList.add('low');
+      setTimeout(() => bar.classList.remove('low'), 500);
+    }
+  };
+  const wrap1 = hpBar1?.parentElement, wrap2 = hpBar2?.parentElement;
+  setHpCritical(wrap1, hpBar1, hp1/maxHp1 < 0.25, prevHp1 !== null && hp1 < prevHp1);
+  setHpCritical(wrap2, hpBar2, hp2/maxHp2 < 0.25, prevHp2 !== null && hp2 < prevHp2);
+  wasCritical1 = hp1/maxHp1 < 0.25;
+  wasCritical2 = hp2/maxHp2 < 0.25;
+
+  // ── Power-up pickup detection (ID scomparso = raccolto) ──
+  const currentIds = new Set((gameState.powerups || []).map(p => p.id));
+  const PU_COLORS = { weapon_grow:'#ffbe00', damage_boost:'#ff4040', speed_boost:'#00ff9d', shield:'#4488ff' };
+  for (const pu of (gameState.powerups || [])) prevPowerupIds.delete(pu.id);
+  // Quello che resta in prevPowerupIds è stato raccolto
+  for (const oldId of prevPowerupIds) {
+    // approssima la posizione vicino al player più vicino — fallback al centro
+    const cx = (p1?.x + p2?.x) / 2 || 400, cy = (p1?.y + p2?.y) / 2 || 250;
+    spawnPickupBurst(cx, cy, '#ffbe00');
+  }
+  prevPowerupIds = currentIds;
+
+  prevHp1 = hp1;
+  prevHp2 = hp2;
+}
+
+// Endgame vignette
+function applyEndgameVignette(){
+  if (arenaWrap) arenaWrap.classList.add('endgame');
+}
+
+// Aggancia il check al render loop esistente
+const _origRender = render;
+render = function(){
+  _origRender();
+  checkDamageEffects();
+};
 
 connect();

@@ -138,7 +138,209 @@ body{
 
 /* ── ARENA ── */
 .arena-wrapper{position:relative;line-height:0}
-#gameCanvas{display:block;width:100%}
+#gameCanvas{display:block;width:100%;transition:transform .04s linear}
+
+/* Screen shake on hit (toggled via class .shake-N) */
+.arena-wrapper.shake-1 #gameCanvas{animation:shake1 .18s ease-out}
+.arena-wrapper.shake-2 #gameCanvas{animation:shake2 .26s ease-out}
+@keyframes shake1{
+  0%,100%{transform:translate(0,0)}
+  25%{transform:translate(-3px,2px)}
+  50%{transform:translate(3px,-1px)}
+  75%{transform:translate(-2px,-2px)}
+}
+@keyframes shake2{
+  0%,100%{transform:translate(0,0)}
+  15%{transform:translate(-6px,3px)}
+  30%{transform:translate(5px,-4px)}
+  50%{transform:translate(-4px,4px)}
+  70%{transform:translate(4px,2px)}
+  85%{transform:translate(-2px,-1px)}
+}
+
+/* Hit flash overlay */
+.arena-wrapper::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(255,255,255,.4) 0%,transparent 60%);
+  opacity:0;transition:opacity .08s ease-out;
+  z-index:3;
+}
+.arena-wrapper.flash::after{opacity:1;transition:opacity .04s ease-out}
+
+/* Vignette urgency (low HP / endgame) */
+.arena-wrapper::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 0 0 rgba(255,40,60,0);
+  transition:box-shadow .3s ease;
+  z-index:2;
+}
+.arena-wrapper.critical::before{
+  box-shadow:inset 0 0 140px 20px rgba(255,40,60,.55);
+  animation:criticalPulse 1.1s ease-in-out infinite;
+}
+.arena-wrapper.endgame::before{
+  box-shadow:inset 0 0 200px 40px rgba(0,0,0,.85);
+}
+@keyframes criticalPulse{
+  0%,100%{box-shadow:inset 0 0 120px 15px rgba(255,40,60,.4)}
+  50%{box-shadow:inset 0 0 170px 30px rgba(255,40,60,.7)}
+}
+
+/* Damage popups floating on canvas */
+.damage-popup{
+  position:absolute;
+  font-family:'Orbitron',monospace;
+  font-size:22px;font-weight:900;
+  pointer-events:none;
+  text-shadow:0 0 10px currentColor, 0 2px 4px rgba(0,0,0,.8);
+  animation:dmgFloat .9s cubic-bezier(.2,.6,.3,1) forwards;
+  z-index:4;letter-spacing:1px;
+  will-change:transform,opacity;
+}
+.damage-popup.crit{font-size:28px}
+@keyframes dmgFloat{
+  0%   {transform:translate(-50%,0) scale(.6);opacity:0}
+  20%  {transform:translate(-50%,-10px) scale(1.15);opacity:1}
+  100% {transform:translate(-50%,-55px) scale(.9);opacity:0}
+}
+
+/* HP bar low-HP shake + glow */
+.hp-bar.low{animation:hpShake .25s ease-in-out 2}
+@keyframes hpShake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-2px)}
+  75%{transform:translateX(2px)}
+}
+.hp-bar-wrap.critical{
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5), 0 0 12px rgba(255,40,60,.6);
+  animation:hpWrapPulse .9s ease-in-out infinite;
+}
+@keyframes hpWrapPulse{
+  0%,100%{box-shadow:inset 0 1px 3px rgba(0,0,0,.5), 0 0 10px rgba(255,40,60,.4)}
+  50%{box-shadow:inset 0 1px 3px rgba(0,0,0,.5), 0 0 18px rgba(255,40,60,.85)}
+}
+
+/* Power-up pickup burst */
+.pickup-burst{
+  position:absolute;width:14px;height:14px;border-radius:50%;
+  pointer-events:none;z-index:4;
+  animation:burstExpand .55s ease-out forwards;
+  will-change:transform,opacity;
+}
+@keyframes burstExpand{
+  0%  {transform:translate(-50%,-50%) scale(.3);opacity:1}
+  100%{transform:translate(-50%,-50%) scale(8);opacity:0}
+}
+
+/* ── TOUCH CONTROLS ── (nascosti di default, mostrati su touch device) */
+.touch-controls{
+  display:none;
+  position:absolute;inset:auto 0 0 0;
+  padding:0 16px 18px;
+  pointer-events:none;
+  justify-content:space-between;align-items:flex-end;
+  user-select:none;-webkit-user-select:none;
+  touch-action:none;
+}
+
+.touch-dpad,.touch-actions{
+  display:flex;gap:14px;pointer-events:auto;
+}
+
+.touch-btn{
+  width:64px;height:64px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,rgba(0,212,255,.18),rgba(11,21,37,.85) 70%);
+  border:1.5px solid rgba(0,212,255,.55);
+  color:#e8f6ff;
+  font-family:'Orbitron',monospace;
+  font-size:22px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  box-shadow:
+    0 0 18px rgba(0,212,255,.28),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 -2px 6px rgba(0,0,0,.4);
+  transition:transform .07s ease,box-shadow .15s ease,background .15s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.touch-btn:active,.touch-btn.pressed{
+  transform:scale(.92);
+  background:radial-gradient(circle at 30% 30%,rgba(0,212,255,.4),rgba(11,21,37,.95) 70%);
+  box-shadow:
+    0 0 28px rgba(0,212,255,.55),
+    inset 0 2px 6px rgba(0,0,0,.5);
+}
+
+.touch-jump{
+  width:78px;height:78px;font-size:26px;
+  background:radial-gradient(circle at 30% 30%,rgba(255,190,0,.22),rgba(11,21,37,.85) 70%);
+  border-color:rgba(255,190,0,.6);
+  box-shadow:
+    0 0 22px rgba(255,190,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -2px 6px rgba(0,0,0,.4);
+  color:#fff3c4;
+}
+.touch-jump:active,.touch-jump.pressed{
+  background:radial-gradient(circle at 30% 30%,rgba(255,190,0,.45),rgba(11,21,37,.95) 70%);
+  box-shadow:
+    0 0 32px rgba(255,190,0,.65),
+    inset 0 2px 6px rgba(0,0,0,.5);
+}
+
+/* Mostra touch controls su dispositivi touch */
+@media (hover:none) and (pointer:coarse){
+  .touch-controls{display:flex}
+  .controls-hint{display:none}
+}
+
+/* ── RESPONSIVE: schermi piccoli (telefoni) ── */
+@media (max-width:640px){
+  body{overflow:auto}
+  .game-wrapper{padding:6px}
+  .game-container{border-radius:14px}
+
+  .game-hud{padding:8px 10px;gap:6px}
+  .fighter-avatar{font-size:20px;width:36px;height:36px}
+  .fighter-name{font-size:9px;letter-spacing:1px}
+  .hp-bar-wrap{max-width:none;height:5px}
+  .hp-text{font-size:8px}
+  .effects-bar{min-height:14px;gap:3px}
+  .effect-pill{font-size:6px;padding:1px 5px}
+
+  .center-hud{gap:2px}
+  .timer-label-small{font-size:6px;letter-spacing:2px}
+  .timer-value{font-size:16px;min-width:44px}
+  .vs-badge{font-size:6px;padding:1px 6px}
+
+  .game-footer{padding:8px 10px;gap:8px;flex-wrap:wrap}
+  .btn-forfeit{padding:6px 12px;font-size:8px;letter-spacing:1px}
+
+  .status-card{padding:32px 28px}
+  .status-message{font-size:16px;letter-spacing:3px}
+  .status-message.countdown{font-size:64px}
+  .status-icon{font-size:42px;margin-bottom:12px}
+
+  .touch-btn{width:56px;height:56px;font-size:18px}
+  .touch-jump{width:68px;height:68px;font-size:22px}
+  .touch-controls{padding:0 10px 12px}
+  .touch-dpad,.touch-actions{gap:10px}
+}
+
+@media (max-width:380px){
+  .touch-btn{width:48px;height:48px;font-size:16px}
+  .touch-jump{width:58px;height:58px;font-size:20px}
+}
+
+/* Orientamento landscape su mobile: HUD più compatto */
+@media (max-height:500px) and (orientation:landscape){
+  .game-hud{padding:6px 12px}
+  .fighter-avatar{width:32px;height:32px;font-size:18px}
+  .timer-value{font-size:14px}
+  .game-footer{display:none}
+  .touch-controls{padding:0 14px 8px}
+}
 
 /* ── FOOTER ── */
 .game-footer{
