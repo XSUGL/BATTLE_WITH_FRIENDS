@@ -100,13 +100,32 @@ router.post(
 // Ritorna il match pending/active dell'utente loggato se esiste.
 // Player 1 fa polling ogni 2s sul dashboard: appena Player 2 accetta
 // (match diventa 'pending'), Player 1 viene rediretto al gioco.
+//
+// Query params opzionali (consigliati per evitare match stantii):
+//   ?since=<msEpoch>        — solo match creati dopo questo timestamp
+//   ?opponent=<username>    — solo match contro questo avversario specifico
 router.get(
   '/active',
   authenticate,
   async (req, res, next) => {
     try {
       const userId = req.user.id;
-      const match = await findActiveMatchForUser(userId);
+
+      const opts = {};
+      const sinceMs = Number.parseInt(req.query.since, 10);
+      if (Number.isFinite(sinceMs) && sinceMs > 0) opts.sinceMs = sinceMs;
+
+      if (typeof req.query.opponent === 'string' && req.query.opponent.trim()) {
+        const opponent = await findUserByUsername(req.query.opponent.trim());
+        if (opponent) opts.opponentId = opponent.id;
+        // Se l'username non esiste, lasciamo opts.opponentId indefinito:
+        // il match non verrà trovato (404), che è il comportamento corretto.
+        else return res.status(404).json({
+          error: { message: 'No active match found', code: 'NOT_FOUND', status: 404 }
+        });
+      }
+
+      const match = await findActiveMatchForUser(userId, opts);
       if (!match) {
         return res.status(404).json({
           error: { message: 'No active match found', code: 'NOT_FOUND', status: 404 }

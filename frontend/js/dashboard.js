@@ -64,7 +64,11 @@ inviteForm.addEventListener('submit', async (e) => {
     inviteSuccess.textContent = 'Invitation sent successfully!';
     inviteSuccess.classList.add('show');
     inviteUsername.value = '';
-    startActiveMatchPolling();
+    // Passa l'avversario invitato e il timestamp di partenza: il polling
+    // accetterà SOLO match contro quell'utente e creati da ora in avanti.
+    // Senza questi filtri, match vecchi 'pending' in DB (test interrotti,
+    // crash) potrebbero deviare uno dei due client su un matchId sbagliato.
+    startActiveMatchPolling(username, Date.now());
     setTimeout(() => { inviteSuccess.classList.remove('show'); }, 3000);
     loadInvitations();
   } catch (error) {
@@ -100,11 +104,16 @@ document.addEventListener('click', async (e) => {
 let activeMatchPollingInterval = null;
 let activeMatchPollingTimeout = null;
 
-function startActiveMatchPolling() {
+function startActiveMatchPolling(opponentUsername = null, sinceMs = null) {
   if (activeMatchPollingInterval) return;
+  // Salva i filtri della sessione di polling corrente
+  const opts = {};
+  if (opponentUsername) opts.opponent = opponentUsername;
+  if (Number.isFinite(sinceMs)) opts.since = sinceMs;
+
   activeMatchPollingInterval = setInterval(async () => {
     try {
-      const match = await getActiveMatch();
+      const match = await getActiveMatch(opts);
       if (match && match.id) {
         clearInterval(activeMatchPollingInterval);
         clearTimeout(activeMatchPollingTimeout);

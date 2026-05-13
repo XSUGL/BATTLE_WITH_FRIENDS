@@ -60,14 +60,49 @@ async function handleJoinMatch(ws, message) {
     return;
   }
 
-  // Rejoin: aggiorna solo il WS se userId già presente
+  // Rejoin: aggiorna solo il WS se userId già presente.
+  // Il takeover è SEMPRE permesso durante le fasi di gioco
+  // ('ready_to_start' / 'playing' / 'ended') — è il flusso legittimo
+  // char-select.html → game.html dove il client chiude il vecchio WS
+  // e ne apre uno nuovo. NON possiamo bloccare quel caso.
+  //
+  // Durante la fase pre-gioco ('waiting' / 'countdown') invece, se il
+  // vecchio WS è ancora vivo e heartbeat fresco, significa che lo stesso
+  // account è loggato da un altro device/tab. Bloccare il secondo evita
+  // il ping-pong infinito di riconnessioni reciproche.
+  const HEARTBEAT_STALE_MS = 12000; // heartbeat client è ogni 5s, lasciamo margine
+  const nowMs = Date.now();
+  const isCharSelectPhase = room.status === 'waiting' || room.status === 'countdown';
+  const isLikelyConcurrentSession = (sock) => {
+    if (!isCharSelectPhase) return false;
+    if (!sock || sock === ws) return false;
+    if (sock.readyState !== 1 /* OPEN */) return false;
+    const hb = sock.lastHeartbeat || 0;
+    return (nowMs - hb) <= HEARTBEAT_STALE_MS;
+  };
+
   let playerNumber = null;
   if (room.player1?.userId === userId) {
-    // Chiudi eventuale WS precedente per evitare due socket attivi sullo stesso slot
+    if (isLikelyConcurrentSession(room.player1.ws)) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'This account is already connected to this match on another device.'
+      }));
+      try { ws.close(); } catch {}
+      return;
+    }
     try { if (room.player1.ws && room.player1.ws !== ws && room.player1.ws.readyState === 1) room.player1.ws.close(); } catch {}
     room.player1.ws = ws;
     playerNumber = 1;
   } else if (room.player2?.userId === userId) {
+    if (isLikelyConcurrentSession(room.player2.ws)) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'This account is already connected to this match on another device.'
+      }));
+      try { ws.close(); } catch {}
+      return;
+    }
     try { if (room.player2.ws && room.player2.ws !== ws && room.player2.ws.readyState === 1) room.player2.ws.close(); } catch {}
     room.player2.ws = ws;
     playerNumber = 2;

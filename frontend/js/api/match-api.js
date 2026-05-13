@@ -67,18 +67,29 @@ export async function acceptInvitation(invitationId) {
 }
 
 // FIX: aggiunta funzione per il polling del player 1 (invitante)
-export async function getActiveMatch() {
-  const response = await fetchWithAuth(`${API_BASE_URL}/matches/active`);
-  
+// `opts.since` (ms epoch) e `opts.opponent` (username) restringono la ricerca
+// al match creato DOPO l'invito CON l'avversario specifico — evita di
+// prendere match vecchi rimasti pending in DB (causa di matchId disallineati).
+export async function getActiveMatch(opts = {}) {
+  const params = new URLSearchParams();
+  if (Number.isFinite(opts.since)) params.set('since', String(opts.since));
+  if (typeof opts.opponent === 'string' && opts.opponent.trim()) {
+    params.set('opponent', opts.opponent.trim());
+  }
+  const qs = params.toString();
+  const url = qs ? `${API_BASE_URL}/matches/active?${qs}` : `${API_BASE_URL}/matches/active`;
+
+  const response = await fetchWithAuth(url);
+
   if (response.status === 404) {
     return null;
   }
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error?.message || 'Failed to fetch active match');
   }
-  
+
   return await response.json();
 }
 

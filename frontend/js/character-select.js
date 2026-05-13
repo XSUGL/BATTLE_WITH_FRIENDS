@@ -15,6 +15,7 @@ let iAmReady      = false;
 let heartbeatIntervalId = null;
 let reconnectAttempts = 0;
 let intentionalClose = false;
+let joinTimeoutId = null;
 // Coda dei messaggi da spedire se il WS non è ancora OPEN
 // (succede se l'utente clicca prima che la connessione sia pronta
 // o durante una riconnessione automatica).
@@ -124,6 +125,15 @@ function connect() {
     // ignora silenziosamente. Il flush parte all'arrivo di 'joined'.
     try { ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token })); }
     catch (err) { console.warn('join_match send failed:', err); }
+
+    // Difesa: se 'joined' non arriva entro 6s, non lasciamo l'utente
+    // bloccato su "Connecting to match..." senza segnali.
+    if (joinTimeoutId) clearTimeout(joinTimeoutId);
+    joinTimeoutId = setTimeout(() => {
+      if (playerNumber == null) {
+        csStatus.textContent = 'Server did not confirm join. Reload the page to retry.';
+      }
+    }, 6000);
   };
 
   ws.onerror = () => {
@@ -136,6 +146,7 @@ function connect() {
 
       case 'joined':
         playerNumber = msg.playerNumber;
+        if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
         csStatus.textContent = `You are Player ${playerNumber} — Choose class and map!`;
         // Ora che il server ha registrato la join (ws.matchId è set lato
         // server), è sicuro spedire le scelte/Ready accodate.

@@ -109,23 +109,47 @@ export async function createMatch(invitationId, player1Id, player2Id, conn = nul
 
 // FIX: cerca sia 'pending' che 'active' così Player 1 viene rediretto
 // subito quando Player 2 accetta (match parte come pending).
-// Limita ai match creati negli ultimi 10 minuti per evitare di tornare
-// match vecchi rimasti appesi (es. test interrotti, crash) che farebbero
-// finire i due client su matchId diversi.
-export async function findActiveMatchForUser(userId, conn = null) {
+//
+// `opts.sinceMs` (ms epoch): se passato, ritorna SOLO match creati dopo
+//   quel timestamp. Serve per ignorare match vecchi rimasti appesi (test
+//   interrotti, crash) che farebbero finire i due client su matchId diversi.
+// `opts.opponentId`: se passato, ritorna SOLO match con quell'avversario.
+//   Ulteriore safety: la inviter pollerà col preciso opponente che ha invitato.
+//
+// Senza i filtri opzionali, mantiene il vecchio comportamento (compatibilità).
+export async function findActiveMatchForUser(userId, opts = {}, conn = null) {
+  // Backward compat: se opts è una connessione (vecchia firma) la spostiamo
+  if (opts && typeof opts.execute === 'function') { conn = opts; opts = {}; }
   const connection = conn || await pool.getConnection();
   const shouldRelease = !conn;
   try {
-    const [result] = await connection.execute(
-      `SELECT id, player1_id, player2_id, status, winner_id, created_at, activated_at
-       FROM matches
-       WHERE status IN ('pending', 'active')
-         AND (player1_id = ? OR player2_id = ?)
-         AND created_at > (NOW() - INTERVAL 10 MINUTE)
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [userId, userId]
-    );
+    const params = [userId, userId];
+    const conditions = [
+      `status IN ('pending', 'active')`,
+      `(player1_id = ? OR player2_id = ?)`,
+    ];
+
+    if (Number.isFinite(opts.sinceMs)) {
+      // Confronto in MS epoch: evita problemi di timezone DB↔server
+      conditions.push(`UNIX_TIMESTAMP(created_at) * 1000 > ?`);
+      params.push(opts.sinceMs);
+    } else {
+      // Fallback senza sinceMs: finestra di 10 minuti come prima
+      conditions.push(`created_at > (NOW() - INTERVAL 10 MINUTE)`);
+    }
+
+    if (Number.isFinite(opts.opponentId)) {
+      conditions.push(`((player1_id = ? AND player2_id = ?) OR (player1_id = ? AND player2_id = ?))`);
+      params.push(userId, opts.opponentId, opts.opponentId, userId);
+    }
+
+    const sql = `SELECT id, player1_id, player2_id, status, winner_id, created_at, activated_at
+                 FROM matches
+                 WHERE ${conditions.join(' AND ')}
+                 ORDER BY created_at DESC
+                 LIMIT 1`;
+
+    const [result] = await connection.execute(sql, params);
     const rows = (Array.isArray(result) && Array.isArray(result[0])) ? result[0] : result;
     if (!rows || rows.length === 0) return null;
     const row = rows[0];
