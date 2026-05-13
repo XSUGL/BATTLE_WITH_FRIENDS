@@ -118,12 +118,12 @@ function connect() {
   ws.onopen = () => {
     reconnectAttempts = 0;
     csStatus.textContent = 'Connecting to match...';
-    // join_match deve essere il PRIMO messaggio sul socket appena aperto:
-    // bypassa la coda e va dritto. Poi flush di eventuali pending
-    // (es. Ready cliccato prima che il socket fosse OPEN).
+    // SOLO join_match qui. NON flushare adesso: handleJoinMatch sul server è
+    // async (await DB) e qualsiasi messaggio successivo arriverebbe prima che
+    // ws.matchId sia settato → handler lato server fa rooms.get(undefined) e
+    // ignora silenziosamente. Il flush parte all'arrivo di 'joined'.
     try { ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token })); }
     catch (err) { console.warn('join_match send failed:', err); }
-    flushPending();
   };
 
   ws.onerror = () => {
@@ -137,6 +137,9 @@ function connect() {
       case 'joined':
         playerNumber = msg.playerNumber;
         csStatus.textContent = `You are Player ${playerNumber} — Choose class and map!`;
+        // Ora che il server ha registrato la join (ws.matchId è set lato
+        // server), è sicuro spedire le scelte/Ready accodate.
+        flushPending();
         break;
 
       case 'opponent_connected':
