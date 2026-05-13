@@ -15,6 +15,34 @@ let iAmReady      = false;
 let heartbeatIntervalId = null;
 let reconnectAttempts = 0;
 let intentionalClose = false;
+// Coda dei messaggi da spedire se il WS non è ancora OPEN
+// (succede se l'utente clicca prima che la connessione sia pronta
+// o durante una riconnessione automatica).
+const pendingMessages = [];
+
+function safeSend(payload) {
+  const data = JSON.stringify(payload);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try { ws.send(data); return true; }
+    catch (err) { console.warn('WS send failed, queueing:', err); }
+  }
+  // Non aperto: accoda. Verrà flushato in onopen.
+  // Evita di accodare heartbeat (sono usa-e-getta).
+  if (payload?.type !== 'heartbeat') pendingMessages.push(data);
+  return false;
+}
+
+function flushPending() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  while (pendingMessages.length) {
+    const data = pendingMessages.shift();
+    try { ws.send(data); } catch (err) {
+      console.warn('WS flush failed, re-queueing:', err);
+      pendingMessages.unshift(data);
+      break;
+    }
+  }
+}
 
 const csStatus       = document.getElementById('csStatus');
 const opponentStatus = document.getElementById('opponentStatus');
@@ -48,8 +76,7 @@ document.querySelector('.classes-grid').addEventListener('click', (e) => {
   card.classList.add('selected');
   selectedClass = card.dataset.class;
   checkReadyBtn();
-  if (ws?.readyState === WebSocket.OPEN)
-    ws.send(JSON.stringify({ type: 'select_class', className: selectedClass }));
+  safeSend({ type: 'select_class', className: selectedClass });
 });
 
 // ── Vota mappa — usa event delegation sul container ──
@@ -61,8 +88,7 @@ document.querySelector('.maps-grid').addEventListener('click', (e) => {
   card.classList.add('voted');
   selectedMap = card.dataset.map;
   checkReadyBtn();
-  if (ws?.readyState === WebSocket.OPEN)
-    ws.send(JSON.stringify({ type: 'vote_map', mapId: selectedMap }));
+  safeSend({ type: 'vote_map', mapId: selectedMap });
 });
 
 // ── Ready ──
@@ -71,7 +97,9 @@ readyBtn.addEventListener('click', () => {
   iAmReady = true;
   readyBtn.textContent = 'WAITING...';
   readyBtn.disabled = true;
-  ws.send(JSON.stringify({ type: 'player_ready' }));
+  // Se il WS non è ancora OPEN il messaggio viene accodato e spedito
+  // automaticamente all'onopen (vedi flushPending) — niente InvalidStateError.
+  safeSend({ type: 'player_ready' });
 });
 
 // ── WebSocket ──
@@ -90,7 +118,12 @@ function connect() {
   ws.onopen = () => {
     reconnectAttempts = 0;
     csStatus.textContent = 'Connecting to match...';
-    ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token }));
+    // join_match deve essere il PRIMO messaggio sul socket appena aperto:
+    // bypassa la coda e va dritto. Poi flush di eventuali pending
+    // (es. Ready cliccato prima che il socket fosse OPEN).
+    try { ws.send(JSON.stringify({ type: 'join_match', matchId, userId: user.id, token })); }
+    catch (err) { console.warn('join_match send failed:', err); }
+    flushPending();
   };
 
   ws.onerror = () => {
@@ -176,8 +209,10 @@ function connect() {
 function startHeartbeat() {
   stopHeartbeat();
   heartbeatIntervalId = setInterval(() => {
-    if (ws && ws.readyState === WebSocket.OPEN)
-      ws.send(JSON.stringify({ type: 'heartbeat' }));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ type: 'heartbeat' })); }
+      catch { /* socket morto fra il check e il send: amen, ci pensa onclose */ }
+    }
   }, 5000);
 }
 
