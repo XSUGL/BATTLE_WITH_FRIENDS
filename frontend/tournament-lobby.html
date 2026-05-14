@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle With Friend — Tournament Lobby</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04080f;--bg2:#070d18;--surface:#0b1525;--border:#162235;--border2:#1e3048;
+  --accent:#00d4ff;--accent2:#ff3d5c;--gold:#ffbe00;--green:#00ff9d;
+  --text:#c4d8f0;--text2:#5a7a99;--text3:#243040;
+}
+html,body{min-height:100%}
+body{font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;position:relative}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(rgba(0,212,255,.1) 1px,transparent 1px);background-size:30px 30px;mask-image:radial-gradient(ellipse 100% 100% at 50% 40%,black 20%,transparent 90%);-webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 40%,black 20%,transparent 90%)}
+.container{max-width:1200px;margin:0 auto;padding:32px 24px;position:relative;z-index:1}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.header h1{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;letter-spacing:5px;color:#fff;text-shadow:0 0 25px rgba(0,212,255,.5)}
+.btn{border:none;border-radius:7px;font-family:'Orbitron',monospace;font-weight:700;letter-spacing:3px;cursor:pointer;transition:all .2s;text-transform:uppercase;padding:10px 20px;font-size:9px}
+.btn-secondary{background:rgba(255,255,255,.04);color:var(--text2);border:1px solid var(--border2)}
+.btn-secondary:hover{background:rgba(255,255,255,.09);color:var(--text)}
+.btn-primary{background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(0,150,200,.1));color:var(--accent);border:1px solid rgba(0,212,255,.45);box-shadow:0 0 20px rgba(0,212,255,.1)}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(0,212,255,.32),rgba(0,180,230,.16));box-shadow:0 0 35px rgba(0,212,255,.3)}
+section{background:linear-gradient(145deg,rgba(11,21,37,.95),rgba(4,8,15,.98));border:1px solid var(--border);border-radius:18px;padding:24px;margin-bottom:22px;position:relative;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.35)}
+section h2{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:5px;color:var(--accent);margin-bottom:16px;text-transform:uppercase;display:flex;align-items:center;gap:12px}
+section h2::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
+
+.tourn-header{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center}
+.tourn-title{font-size:24px;font-weight:700;color:#fff;letter-spacing:1px}
+.pill{padding:3px 10px;border-radius:11px;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;border:1px solid rgba(0,212,255,.25);background:rgba(0,212,255,.08);color:var(--accent)}
+.pill-running{background:rgba(255,190,0,.08);border-color:rgba(255,190,0,.3);color:var(--gold)}
+.pill-completed{background:rgba(0,255,157,.08);border-color:rgba(0,255,157,.3);color:var(--green)}
+.tourn-stats{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:6px;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:1.5px;color:var(--text2)}
+
+.players-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.player-tile{padding:12px 14px;border:1px solid var(--border2);border-radius:8px;background:rgba(4,8,15,.6);display:flex;align-items:center;gap:10px}
+.player-tile.eliminated{opacity:.45;border-style:dashed}
+.player-tile.me{border-color:var(--accent);box-shadow:0 0 14px rgba(0,212,255,.2)}
+.player-seed{font-family:'Orbitron',monospace;font-size:11px;color:var(--gold);min-width:24px}
+.player-name{font-size:15px;color:#fff}
+.empty-slot{font-style:italic;color:var(--text3)}
+
+.bracket{display:flex;gap:18px;overflow-x:auto;padding-bottom:8px}
+.bracket-round{flex:0 0 auto;min-width:230px;display:flex;flex-direction:column;justify-content:space-around;gap:14px}
+.round-label{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;color:var(--text2);text-align:center;margin-bottom:6px}
+.match-tile{padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(4,8,15,.7);border-left:3px solid var(--accent2);display:flex;flex-direction:column;gap:4px;font-size:13px}
+.match-tile.completed{border-left-color:var(--green)}
+.match-tile.pending{border-left-color:var(--text3);opacity:.7}
+.match-tile.active{border-left-color:var(--gold);box-shadow:0 0 10px rgba(255,190,0,.15)}
+.match-tile.mine{outline:1px solid rgba(0,212,255,.5);background:rgba(0,212,255,.04)}
+.match-side{display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:4px}
+.match-side.winner{background:rgba(0,255,157,.08);color:#fff;font-weight:600}
+.match-side.loser{color:var(--text2);text-decoration:line-through}
+.match-vs{text-align:center;font-family:'Orbitron',monospace;font-size:8px;color:var(--text3);letter-spacing:2px}
+.match-meta{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:1.5px;color:var(--text2);text-align:center}
+
+.cta-section{padding:18px;text-align:center}
+.cta-banner{display:inline-block;padding:14px 22px;background:linear-gradient(135deg,rgba(255,190,0,.18),rgba(180,130,0,.08));border:1px solid rgba(255,190,0,.5);border-radius:10px;font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px;color:var(--gold);box-shadow:0 0 18px rgba(255,190,0,.18);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 18px rgba(255,190,0,.18)}50%{box-shadow:0 0 30px rgba(255,190,0,.45)}}
+.cta-section .btn{margin-top:12px;font-size:11px;padding:14px 28px}
+
+.empty{color:var(--text2);font-size:12px;font-family:'Orbitron',monospace;letter-spacing:1px;padding:16px 0;text-align:center}
+.winner-banner{text-align:center;padding:18px;border:1px solid rgba(0,255,157,.3);background:rgba(0,255,157,.06);border-radius:10px;margin-bottom:14px}
+.winner-banner .crown{font-size:36px;display:block;margin-bottom:6px}
+.winner-banner .label{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:4px;color:var(--green)}
+.winner-banner .name{font-size:24px;font-weight:700;color:#fff;letter-spacing:1px;margin-top:4px}
+
+@media(max-width:600px){.bracket{gap:10px}.bracket-round{min-width:170px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="header">
+    <h1>🏆 TOURNAMENT</h1>
+    <div>
+      <a href="/webapp2/tournaments.html" class="btn btn-secondary">← TOURNAMENTS</a>
+      <a href="/webapp2/dashboard.html" class="btn btn-secondary">DASHBOARD</a>
+    </div>
+  </header>
+
+  <section id="header-section">
+    <div id="loading" class="empty">Loading tournament…</div>
+    <div id="tourn-content" style="display:none">
+      <div class="tourn-header">
+        <div>
+          <div class="tourn-title" id="tname"></div>
+          <div class="tourn-stats" id="tstats"></div>
+        </div>
+        <div id="tstatus"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cta-section" style="display:none">
+    <div class="cta-section">
+      <div class="cta-banner" id="cta-banner">YOUR NEXT MATCH IS READY</div>
+      <br>
+      <button class="btn btn-primary" id="cta-btn">⚔ ENTER MATCH</button>
+    </div>
+  </section>
+
+  <section id="players-section">
+    <h2>PARTICIPANTS</h2>
+    <div class="players-grid" id="players"></div>
+  </section>
+
+  <section id="bracket-section" style="display:none">
+    <h2>BRACKET</h2>
+    <div class="bracket" id="bracket"></div>
+  </section>
+</div>
+<script type="module" src="js/tournament-lobby.js"></script>
+</body>
+</html>

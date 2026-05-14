@@ -58,6 +58,7 @@ body::after{
   border:none;border-radius:7px;font-family:'Orbitron',monospace;
   font-weight:700;letter-spacing:3px;cursor:pointer;
   transition:all .2s;text-transform:uppercase;position:relative;overflow:hidden;
+  text-decoration:none;display:inline-block;
 }
 .btn::before{
   content:'';position:absolute;inset:0;
@@ -215,6 +216,7 @@ section p{color:var(--text2);font-size:12px;font-family:'Orbitron',monospace;let
   <header class="dashboard-header">
     <h1>⚔ BATTLE WITH FRIEND</h1>
     <div class="user-info">
+      <a href="/webapp2/tournaments.html" class="btn btn-primary">🏆 TOURNAMENTS</a>
       <span id="username-display"></span>
       <button id="logout-btn" class="btn btn-secondary">LOGOUT</button>
     </div>

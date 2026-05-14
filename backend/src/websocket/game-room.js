@@ -2,6 +2,7 @@ import { GameState, CLASSES, MAPS } from '../game/game-state.js';
 import pool from '../utils/db.js';
 import { updateMatchStatus, completeMatch, findMatchById } from '../models/match-model.js';
 import { saveMatchResults } from '../models/score-model.js';
+import { advanceTournamentAfterMatch } from '../models/tournament-model.js';
 
 export class GameRoom {
   constructor(matchId, onCleanup = null) {
@@ -30,6 +31,10 @@ export class GameRoom {
     const m = await findMatchById(this.matchId);
     if (m) {
       this.roles = { p1: m.player1_id, p2: m.player2_id };
+      // Match di torneo: propaghiamo i metadati così il client può tornare
+      // alla pagina del torneo dopo game_over.
+      this.tournamentId = m.tournament_id ?? null;
+      this.tournamentRound = m.round ?? null;
     }
     return this.roles;
   }
@@ -161,6 +166,15 @@ export class GameRoom {
         await conn.beginTransaction();
         await completeMatch(this.matchId, winnerId, conn);
         await saveMatchResults(this.matchId, winnerId, loserId, conn);
+        // Se questo era un match di torneo, avanza il bracket nella stessa
+        // transazione (eventuale match successivo creato, vincitore di
+        // torneo con bonus +30, partecipanti eliminati aggiornati).
+        try {
+          await advanceTournamentAfterMatch(this.matchId, winnerId, loserId, conn);
+        } catch (e) {
+          // Non rompiamo il salvataggio del match per un errore di avanzamento
+          console.error('Tournament advance error:', e);
+        }
         await conn.commit();
       } catch (e) {
         await conn.rollback();
@@ -175,7 +189,9 @@ export class GameRoom {
       finalHp: {
         player1: this.gameState?.player1?.hp ?? 0,
         player2: this.gameState?.player2?.hp ?? 0
-      }
+      },
+      tournamentId: this.tournamentId ?? null,
+      tournamentRound: this.tournamentRound ?? null
     });
 
     // Pulisci la room dal Map dopo che i client hanno avuto il tempo

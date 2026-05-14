@@ -169,7 +169,13 @@ function connect(){
         }, 350);
         // Chiudi esplicitamente il WS prima del redirect
         try { ws?.close(); } catch {}
-        setTimeout(()=>window.location.href='/webapp2/dashboard.html', 4000);
+        // Se era un match di torneo, torna alla lobby del torneo invece che
+        // alla dashboard — così il giocatore vede subito il bracket aggiornato
+        // e, se ha vinto, può attendere il prossimo round (o vedere la finale).
+        const redirectUrl = msg.tournamentId
+          ? `/webapp2/tournament-lobby.html?id=${msg.tournamentId}`
+          : '/webapp2/dashboard.html';
+        setTimeout(()=>window.location.href=redirectUrl, 4000);
         break;
       }
       case 'error':

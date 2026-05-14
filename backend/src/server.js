@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import matchesRoutes from './routes/matches.js';
 import leaderboardRoutes from './routes/leaderboard.js';
+import tournamentsRoutes from './routes/tournaments.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { createGameServer } from './websocket/game-server.js'; // 👈 Il nostro nuovo motore di gioco!
 
@@ -36,9 +37,11 @@ app.use(express.static(frontendPath));
 app.use('/webapp2/api/auth', authRoutes);
 app.use('/webapp2/api/matches', matchesRoutes);
 app.use('/webapp2/api/leaderboard', leaderboardRoutes);
+app.use('/webapp2/api/tournaments', tournamentsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/tournaments', tournamentsRoutes);
 
 // Serve index.html for root path (SPA fallback)
 app.get('/', (req, res) => {
