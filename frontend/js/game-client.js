@@ -574,6 +574,14 @@ document.getElementById('forfeitBtn').addEventListener('click',()=>{
 });
 
 // ─── TOUCH CONTROLS ───
+// Feature detection: alcuni browser (Samsung Internet con DeX/S-Pen, Chrome
+// con touch laptop, ecc.) non matchano `(hover:none) and (pointer:coarse)`
+// anche su device chiaramente touch. Se rileviamo touch capability via JS,
+// forziamo la visualizzazione dei pulsanti aggiungendo body.has-touch.
+if ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) {
+  document.body.classList.add('has-touch');
+}
+
 function bindTouchButton(btnId, key){
   const btn = document.getElementById(btnId);
   if (!btn) return;

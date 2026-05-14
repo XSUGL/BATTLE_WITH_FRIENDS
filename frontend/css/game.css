@@ -289,11 +289,23 @@ body{
     inset 0 2px 6px rgba(0,0,0,.5);
 }
 
-/* Mostra touch controls su dispositivi touch */
-@media (hover:none) and (pointer:coarse){
+/* Mostra touch controls su dispositivi touch.
+   Usiamo `any-pointer: coarse` invece di `pointer: coarse` perché Samsung
+   Internet (e Chrome con DeX, S-Pen, touch-laptop, ecc.) può riportare
+   `pointer: fine` se ha ANCHE un mouse/stilo connesso. `any-pointer`
+   matcha se ALMENO uno dei pointing device è touch — è il check corretto
+   per "questo schermo è touch?". */
+@media (any-pointer: coarse){
   .touch-controls{display:flex}
   .controls-hint{display:none}
 }
+
+/* Fallback JS-driven: se 'ontouchstart' in window o maxTouchPoints>0,
+   il client aggiunge body.has-touch e forza la visualizzazione.
+   Copre il caso in cui un browser quirky non matcha nessun media query
+   ma è chiaramente touch-capable. */
+body.has-touch .touch-controls{display:flex}
+body.has-touch .controls-hint{display:none}
 
 /* ── RESPONSIVE: schermi piccoli (telefoni) ── */
 @media (max-width:640px){
