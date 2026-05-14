@@ -3,16 +3,12 @@
 -- DA ESEGUIRE UNA VOLTA sul DB di Marconi (via SSH):
 --   mysql -u <user> -p <db_name> < 006_create_tournaments.sql
 --
--- Sicuro su DB esistenti: nessun DROP TABLE, ALTER non-distruttivi (ADD COLUMN
--- con default NULL su `matches`).
-
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS tournament_participants;
-DROP TABLE IF EXISTS tournaments;
-SET FOREIGN_KEY_CHECKS = 1;
+-- Idempotente: usa CREATE TABLE IF NOT EXISTS e una stored procedure che
+-- aggiunge le colonne/indici/FK su `matches` solo se mancano. Sicuro su
+-- rerun parziali. NON distrugge i tornei già esistenti.
 
 -- Anagrafica torneo
-CREATE TABLE tournaments (
+CREATE TABLE IF NOT EXISTS tournaments (
   id            INT PRIMARY KEY AUTO_INCREMENT,
   name          VARCHAR(80) NOT NULL,
   size          TINYINT NOT NULL COMMENT '2, 4, 8, 16, 32',
@@ -29,7 +25,7 @@ CREATE TABLE tournaments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Iscritti al torneo
-CREATE TABLE tournament_participants (
+CREATE TABLE IF NOT EXISTS tournament_participants (
   tournament_id   INT NOT NULL,
   user_id         INT NOT NULL,
   seed            INT NULL COMMENT 'posizione nel bracket (1..size) assegnata allo start',
@@ -43,9 +39,49 @@ CREATE TABLE tournament_participants (
 
 -- Aggiunta non-distruttiva a matches: NULL = match 1v1 normale (comportamento attuale).
 -- Solo i match di torneo hanno tournament_id/round/bracket_slot valorizzati.
-ALTER TABLE matches
-  ADD COLUMN tournament_id INT NULL AFTER status,
-  ADD COLUMN round         INT NULL AFTER tournament_id,
-  ADD COLUMN bracket_slot  INT NULL COMMENT 'indice match nel round, 0-based' AFTER round,
-  ADD INDEX idx_matches_tournament (tournament_id, round),
-  ADD CONSTRAINT fk_matches_tournament FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE SET NULL;
+-- Idempotente via stored procedure (MySQL non supporta ADD COLUMN IF NOT EXISTS prima di 8.0.29).
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS _migration_006_matches //
+CREATE PROCEDURE _migration_006_matches()
+BEGIN
+  DECLARE has_it INT DEFAULT 0;
+
+  SELECT COUNT(*) INTO has_it FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'tournament_id';
+  IF has_it = 0 THEN
+    ALTER TABLE matches ADD COLUMN tournament_id INT NULL AFTER status;
+  END IF;
+
+  SELECT COUNT(*) INTO has_it FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'round';
+  IF has_it = 0 THEN
+    ALTER TABLE matches ADD COLUMN round INT NULL AFTER tournament_id;
+  END IF;
+
+  SELECT COUNT(*) INTO has_it FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'bracket_slot';
+  IF has_it = 0 THEN
+    ALTER TABLE matches ADD COLUMN bracket_slot INT NULL
+      COMMENT 'indice match nel round, 0-based' AFTER round;
+  END IF;
+
+  SELECT COUNT(*) INTO has_it FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND INDEX_NAME = 'idx_matches_tournament';
+  IF has_it = 0 THEN
+    ALTER TABLE matches ADD INDEX idx_matches_tournament (tournament_id, round);
+  END IF;
+
+  SELECT COUNT(*) INTO has_it FROM information_schema.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches'
+      AND CONSTRAINT_NAME = 'fk_matches_tournament' AND CONSTRAINT_TYPE = 'FOREIGN KEY';
+  IF has_it = 0 THEN
+    ALTER TABLE matches ADD CONSTRAINT fk_matches_tournament
+      FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE SET NULL;
+  END IF;
+END //
+
+DELIMITER ;
+
+CALL _migration_006_matches();
+DROP PROCEDURE IF EXISTS _migration_006_matches;
