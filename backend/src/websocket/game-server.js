@@ -1,6 +1,7 @@
 import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { GameRoom } from './game-room.js';
+import pool from '../utils/db.js';
 
 const rooms = new Map();
 
@@ -206,3 +207,39 @@ setInterval(() => {
     if (room.isInactive(now)) rooms.delete(matchId);
   });
 }, 30000);
+
+// ── Sweep DB: cancella i match "orfani" rimasti pending/active in DB
+// più vecchi di 15 minuti e NON presenti nella Map rooms (= nessuna
+// stanza viva li sta gestendo). Senza questo, dopo un crash o un
+// abbandono il match resta a vita in DB e il polling di /matches/active
+// può tornarlo come "match attivo" deviando i client su matchId sbagliati.
+async function sweepStaleMatches() {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const [rows] = await conn.execute(
+      `SELECT id FROM matches
+       WHERE status IN ('pending', 'active')
+         AND created_at < (NOW() - INTERVAL 15 MINUTE)`
+    );
+    const list = (Array.isArray(rows) && Array.isArray(rows[0])) ? rows[0] : (rows || []);
+    if (!list.length) return;
+
+    const toCancel = list.filter(r => !rooms.has(Number(r.id))).map(r => Number(r.id));
+    if (!toCancel.length) return;
+
+    // Cancella in batch — usa parametri singoli per evitare problemi col driver
+    for (const id of toCancel) {
+      await conn.execute(`UPDATE matches SET status = 'cancelled' WHERE id = ?`, [id]);
+    }
+    console.log(`[sweepStaleMatches] cancelled ${toCancel.length} orphan match(es):`, toCancel.join(','));
+  } catch (e) {
+    console.warn('sweepStaleMatches error:', e?.message);
+  } finally {
+    if (conn) conn.release();
+  }
+}
+// Esegui all'avvio (dopo 30s, per dare tempo al pool di stabilizzarsi)
+// e poi ogni minuto.
+setTimeout(sweepStaleMatches, 30_000);
+setInterval(sweepStaleMatches, 60_000);

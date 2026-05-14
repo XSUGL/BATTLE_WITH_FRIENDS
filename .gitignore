@@ -19,3 +19,6 @@ Desktop.ini
 .idea/
 *.swp
 *.swo
+
+# ─── Claude Code local sessions / worktrees ────────────────────────────────────
+.claude/

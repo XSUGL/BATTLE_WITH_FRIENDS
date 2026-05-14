@@ -16,6 +16,10 @@ let gameOver = false;
 let renderIntervalId = null;
 let inputIntervalId = null;
 let heartbeatIntervalId = null;
+// Connection robustness
+let reconnectAttempts = 0;
+let intentionalClose = false;
+let joinTimeoutId = null;
 
 const canvas        = document.getElementById('gameCanvas');
 const ctx           = canvas.getContext('2d');
@@ -82,13 +86,40 @@ async function loadWeaponImages() {
 function connect(){
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}/webapp2/ws`;
+
+  // Cleanup eventuale WS precedente (in caso di reconnect)
+  if (ws) {
+    try { ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; } catch {}
+    try { ws.close(); } catch {}
+  }
+
   ws = new WebSocket(wsUrl);
-  ws.onopen = () => ws.send(JSON.stringify({type:'join_match',matchId,userId:user.id,token}));
+
+  ws.onopen = () => {
+    reconnectAttempts = 0;
+    setStatus('⚔️','CONNECTING TO MATCH','');
+    try { ws.send(JSON.stringify({type:'join_match',matchId,userId:user.id,token})); }
+    catch (err) { console.warn('join_match send failed:', err); }
+
+    // Difesa: se 'joined' non arriva entro 6s mostra errore esplicito.
+    if (joinTimeoutId) clearTimeout(joinTimeoutId);
+    joinTimeoutId = setTimeout(() => {
+      if (playerNumber == null) {
+        setStatus('⚠️','SERVER NOT RESPONDING','Reload the page to retry.');
+      }
+    }, 6000);
+  };
+
+  ws.onerror = () => {
+    if (playerNumber == null) setStatus('📡','CONNECTION ERROR','Retrying...');
+  };
+
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
     switch(msg.type){
       case 'joined':
         playerNumber = msg.playerNumber;
+        if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
         setStatus('⚔️','WAITING FOR OPPONENT','');
         ws.send(JSON.stringify({type:'game_ready'}));
         break;
@@ -123,6 +154,7 @@ function connect(){
       case 'game_over': {
         if (gameOver) break; // ignora duplicati
         gameOver = true;
+        intentionalClose = true;
         // Ferma TUTTI gli intervalli per evitare timer fantasma
         stopAllIntervals();
         const won = playerNumber === msg.winner;
@@ -141,13 +173,28 @@ function connect(){
         break;
       }
       case 'error':
+        intentionalClose = true;
+        try { ws?.close(); } catch {}
         alert(msg.message);
         window.location.href = '/webapp2/dashboard.html';
         break;
     }
   };
+
   ws.onclose = () => {
-    if(gameState){ statusMessage.className='status-message'; setStatus('📡','DISCONNECTED','Connection lost'); }
+    if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+    if (intentionalClose) return;
+    // Se il game è già finito non riconnettere
+    if (gameOver) return;
+
+    if (reconnectAttempts < 5) {
+      reconnectAttempts++;
+      statusMessage.className = 'status-message';
+      setStatus('📡','RECONNECTING',`Attempt ${reconnectAttempts}/5...`);
+      setTimeout(connect, 800 * reconnectAttempts);
+    } else {
+      setStatus('📡','DISCONNECTED','Connection lost — reload the page.');
+    }
   };
 }
 
@@ -169,6 +216,7 @@ function stopAllIntervals(){
 
 // Pulizia su unload (es. utente che chiude o naviga via)
 window.addEventListener('beforeunload', () => {
+  intentionalClose = true;
   stopAllIntervals();
   try { ws?.close(); } catch {}
 });
