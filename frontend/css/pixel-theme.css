@@ -1,0 +1,618 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   PIXEL-ART THEME — overlay che converte il look cyberpunk-smooth nello
+   stesso stile pixel del gioco. Caricato DOPO gli <style> inline delle
+   pagine così vince per ordine. Usa !important con parsimonia solo dove
+   serve sovrascrivere proprietà inline (border-radius, gradient, ecc).
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Pixel fonts da Google Fonts ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+/* ── Reset gradienti soft + abilita rendering pixelato ────────────────── */
+:root {
+  --px-bg:        #0a0e1a;
+  --px-bg2:       #0e1428;
+  --px-surface:   #131b2e;
+  --px-border:    #00d4ff;
+  --px-border-d:  #00819e; /* dark cyan per ombra "8-bit" */
+  --px-accent:    #00d4ff;
+  --px-accent2:   #ff3d5c;
+  --px-accent2-d: #8a1a2e;
+  --px-gold:      #ffbe00;
+  --px-gold-d:    #8a6500;
+  --px-green:     #00ff9d;
+  --px-green-d:   #009060;
+  --px-text:      #d4e4f8;
+  --px-text2:     #6080a8;
+  --px-text-dim:  #344458;
+  --px-shadow:    #02040a;
+  --px-pixel:     4px; /* unità pixel base */
+}
+
+/* ── Background pixel: grid scuro a punti grossi ──────────────────────── */
+html, body {
+  background: var(--px-bg) !important;
+  color: var(--px-text) !important;
+  font-family: 'VT323', 'Courier New', monospace !important;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+}
+
+body::before {
+  content: '' !important;
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  background-image:
+    /* punti grossi cyan tenui */
+    radial-gradient(rgba(0,212,255,0.08) 2px, transparent 2px),
+    /* checker scuro sottile */
+    linear-gradient(45deg, rgba(255,255,255,0.012) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.012) 75%) !important;
+  background-size: 24px 24px, 8px 8px !important;
+  background-position: 0 0, 0 0 !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+
+body::after {
+  /* Scanline globale orizzontale tipo CRT */
+  content: '' !important;
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.06) 0,
+    rgba(0, 0, 0, 0.06) 2px,
+    transparent 2px,
+    transparent 4px
+  ) !important;
+  background-size: 100% 4px !important;
+}
+
+/* ── Tipografia: titoli in Press Start 2P ─────────────────────────────── */
+h1, h2, h3, .header h1, .dashboard-header h1, section h2,
+.cs-title, .tourn-title {
+  font-family: 'Press Start 2P', 'VT323', monospace !important;
+  font-weight: 400 !important;
+  letter-spacing: 1px !important;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: none;
+  text-shadow:
+    var(--px-pixel) var(--px-pixel) 0 var(--px-shadow),
+    0 0 16px rgba(0, 212, 255, 0.35) !important;
+}
+
+h1, .header h1, .dashboard-header h1 { font-size: 14px !important; }
+section h2 { font-size: 11px !important; }
+h3 { font-size: 10px !important; }
+
+/* Stile font generale per UI text (più leggibile di Press Start) */
+p, span, div, a, button, input, select, label, td, th, li {
+  font-family: 'VT323', 'Courier New', monospace !important;
+}
+
+/* ── Bottoni: chunky 8-bit con offset shadow + active depression ─────── */
+.btn, button.btn, a.btn, button[type="submit"], input[type="submit"] {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 2px !important;
+  border-radius: 0 !important;
+  border: 2px solid var(--px-shadow) !important;
+  padding: 12px 18px !important;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.06s, box-shadow 0.06s !important;
+  text-decoration: none !important;
+  display: inline-block;
+  text-transform: uppercase !important;
+  background: var(--px-surface) !important;
+  color: var(--px-text) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.45),
+    inset  2px  2px 0 0 rgba(255,255,255,0.10),
+    0 var(--px-pixel) 0 var(--px-shadow) !important;
+}
+.btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.45),
+    inset  2px  2px 0 0 rgba(255,255,255,0.18),
+    0 5px 0 var(--px-shadow) !important;
+}
+.btn:active {
+  transform: translateY(var(--px-pixel)) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.45),
+    inset  2px  2px 0 0 rgba(255,255,255,0.10),
+    0 0 0 var(--px-shadow) !important;
+}
+.btn:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* Bottone primario cyan */
+.btn-primary {
+  background: var(--px-accent) !important;
+  color: var(--px-shadow) !important;
+  border-color: var(--px-shadow) !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-border-d),
+    inset  2px  2px 0 0 #aaf0ff,
+    0 var(--px-pixel) 0 var(--px-shadow) !important;
+  text-shadow: 1px 1px 0 rgba(255,255,255,0.4) !important;
+}
+.btn-primary:hover {
+  background: #5eecff !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-border-d),
+    inset  2px  2px 0 0 #cef6ff,
+    0 5px 0 var(--px-shadow) !important;
+}
+
+/* Bottone secondario grigio */
+.btn-secondary {
+  background: var(--px-surface) !important;
+  color: var(--px-text2) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.5),
+    inset  2px  2px 0 0 rgba(255,255,255,0.06),
+    0 var(--px-pixel) 0 var(--px-shadow) !important;
+}
+.btn-secondary:hover {
+  color: var(--px-text) !important;
+  background: #1c2843 !important;
+}
+
+/* Bottone oro (gold) — usato per tornei / create */
+.btn-gold {
+  background: var(--px-gold) !important;
+  color: var(--px-shadow) !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-gold-d),
+    inset  2px  2px 0 0 #fff080,
+    0 var(--px-pixel) 0 var(--px-shadow) !important;
+}
+.btn-gold:hover {
+  background: #ffd040 !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-gold-d),
+    inset  2px  2px 0 0 #fff8a0,
+    0 5px 0 var(--px-shadow) !important;
+}
+
+/* ── Cards / Sections: square corners, hard border, no gradient ──────── */
+section, .class-card, .invitation-card, .leaderboard-card,
+.match-history-card, .tourn-card, .player-tile, .match-tile,
+.dashboard-main section, .winner-banner {
+  border-radius: 0 !important;
+  background: var(--px-surface) !important;
+  border: 2px solid var(--px-shadow) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.5),
+    inset  2px  2px 0 0 rgba(255,255,255,0.05),
+    0 var(--px-pixel) 0 var(--px-shadow) !important;
+}
+
+section::before, section::after,
+.class-card::before, .class-card::after { content: none !important; }
+
+/* ── Headers (sticky top) ────────────────────────────────────────────── */
+.dashboard-header, .header {
+  background: var(--px-bg2) !important;
+  border-bottom: 4px solid var(--px-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.dashboard-header::after { display: none !important; }
+
+/* ── Input fields ───────────────────────────────────────────────────── */
+input, select, textarea {
+  font-family: 'VT323', monospace !important;
+  font-size: 18px !important;
+  border-radius: 0 !important;
+  border: 2px solid var(--px-shadow) !important;
+  background: #050810 !important;
+  color: var(--px-text) !important;
+  padding: 10px 12px !important;
+  outline: none;
+  box-shadow:
+    inset 2px 2px 0 0 rgba(0,0,0,0.5),
+    inset -1px -1px 0 0 rgba(255,255,255,0.05) !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--px-accent) !important;
+  box-shadow:
+    inset 2px 2px 0 0 rgba(0,212,255,0.15),
+    0 0 0 2px rgba(0,212,255,0.35) !important;
+}
+::placeholder { color: var(--px-text-dim) !important; opacity: 1; }
+
+/* ── Status / error / success messages ──────────────────────────────── */
+.error-message, .success-message {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 1px !important;
+  padding: 8px 10px !important;
+  border-radius: 0 !important;
+}
+.error-message {
+  border: 2px solid var(--px-accent2) !important;
+  background: rgba(255, 61, 92, 0.08) !important;
+  color: var(--px-accent2) !important;
+}
+.success-message {
+  border: 2px solid var(--px-green) !important;
+  background: rgba(0, 255, 157, 0.08) !important;
+  color: var(--px-green) !important;
+}
+
+/* ── Pills / badges (status indicator) ───────────────────────────────── */
+.pill, .tourn-meta .pill, .pill-running, .pill-completed {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 7px !important;
+  letter-spacing: 1px !important;
+  border-radius: 0 !important;
+  padding: 4px 8px !important;
+  border-width: 2px !important;
+  border-style: solid !important;
+}
+
+/* ── Character-select class cards ───────────────────────────────────── */
+.class-card {
+  border-radius: 0 !important;
+  background: var(--px-surface) !important;
+  cursor: pointer;
+  transition: transform 0.08s !important;
+}
+.class-card:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.5),
+    inset  2px  2px 0 0 rgba(255,255,255,0.10),
+    6px 6px 0 var(--px-shadow) !important;
+}
+.class-card.selected {
+  border-color: var(--px-accent) !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-border-d),
+    inset  2px  2px 0 0 #aaf0ff,
+    0 0 0 2px var(--px-accent),
+    6px 6px 0 var(--px-shadow) !important;
+}
+.class-icon {
+  font-size: 48px !important;
+  image-rendering: pixelated;
+  filter: drop-shadow(2px 2px 0 var(--px-shadow));
+}
+.class-name {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  margin-top: 8px !important;
+}
+
+/* Stat bars con chunky pixel fill */
+.stat-bar {
+  border-radius: 0 !important;
+  border: 2px solid var(--px-shadow) !important;
+  background: #050810 !important;
+  height: 10px !important;
+  overflow: hidden;
+}
+.stat-fill {
+  background: var(--px-accent) !important;
+  border-radius: 0 !important;
+  box-shadow: inset -1px -1px 0 var(--px-border-d), inset 1px 1px 0 #aaf0ff !important;
+}
+
+/* ── Tournament bracket pieces ───────────────────────────────────────── */
+.match-tile {
+  border-left-width: 4px !important;
+}
+.match-tile.mine {
+  outline: 2px solid var(--px-accent) !important;
+  outline-offset: -2px;
+}
+.match-side.winner {
+  background: rgba(0,255,157,0.12) !important;
+  color: var(--px-green) !important;
+}
+
+/* ── Tournament size buttons ─────────────────────────────────────────── */
+.size-btn {
+  border-radius: 0 !important;
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  padding: 10px 12px !important;
+  border: 2px solid var(--px-shadow) !important;
+  background: var(--px-surface) !important;
+  color: var(--px-text2) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.5),
+    inset  2px  2px 0 0 rgba(255,255,255,0.06),
+    0 3px 0 var(--px-shadow) !important;
+}
+.size-btn:hover {
+  color: var(--px-text) !important;
+  transform: translateY(-1px);
+}
+.size-btn.selected {
+  background: var(--px-accent) !important;
+  color: var(--px-shadow) !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-border-d),
+    inset  2px  2px 0 0 #aaf0ff,
+    0 3px 0 var(--px-shadow) !important;
+}
+
+/* ── Login (index.html) — auth form ──────────────────────────────────── */
+.auth-container, .login-container, form.auth-form {
+  border-radius: 0 !important;
+}
+.auth-container::before, .login-container::before { content: none !important; }
+
+/* ── Leaderboard rows ────────────────────────────────────────────────── */
+.leaderboard-row, .leaderboard-item {
+  border-radius: 0 !important;
+  border-bottom: 2px solid var(--px-bg2) !important;
+}
+
+/* ── Username display + small labels ─────────────────────────────────── */
+#username-display, .small-label, .section-label {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 2px !important;
+}
+
+/* ── Pixel decorations: angoli "L" sui blocchi importanti ────────────── */
+.dashboard-main section,
+.tourn-card,
+.class-card {
+  position: relative;
+}
+.dashboard-main section::before {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px;
+  width: 8px; height: 8px;
+  background:
+    linear-gradient(to right,  var(--px-accent) 50%, transparent 50%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, var(--px-accent) 50%, transparent 50%) left/2px 100% no-repeat;
+  pointer-events: none;
+  z-index: 1;
+}
+.dashboard-main section::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; right: -2px;
+  width: 8px; height: 8px;
+  background:
+    linear-gradient(to right,  transparent 50%, var(--px-accent2) 50%) bottom/100% 2px no-repeat,
+    linear-gradient(to bottom, transparent 50%, var(--px-accent2) 50%) right/2px 100% no-repeat;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Touch buttons (mobile) — più chunky ─────────────────────────────── */
+.touch-btn {
+  border-radius: 0 !important;
+  border: 2px solid var(--px-shadow) !important;
+  font-family: 'Press Start 2P', monospace !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.45),
+    inset  2px  2px 0 0 rgba(255,255,255,0.10),
+    0 var(--px-pixel) 0 var(--px-shadow) !important;
+}
+.touch-btn:active {
+  transform: translateY(var(--px-pixel)) !important;
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0,0,0,0.45),
+    inset  2px  2px 0 0 rgba(255,255,255,0.10),
+    0 0 0 var(--px-shadow) !important;
+}
+
+/* ── Tournament lobby cta banner ─────────────────────────────────────── */
+.cta-banner {
+  border-radius: 0 !important;
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 11px !important;
+  border: 2px solid var(--px-gold) !important;
+  background: rgba(255,190,0,0.12) !important;
+}
+
+/* ── Game HUD: preservato (font Orbitron del gioco) ──────────────────── */
+.hud, .game-hud, #gameCanvas, .arena-wrapper { font-family: inherit; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE OPTIMIZATIONS — telefoni e tablet piccoli
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Impedisci il "double-tap zoom" e l'evidenziatore blu di iOS sui tap */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, .btn, .class-card, .size-btn, .touch-btn {
+  touch-action: manipulation;
+}
+
+/* Safe-area su iPhone con notch */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ── Tablet / phone landscape (<= 900px) ─────────────────────────────── */
+@media (max-width: 900px) {
+  html, body { font-size: 17px; }
+  h1, .header h1, .dashboard-header h1 { font-size: 12px !important; line-height: 1.4 !important; }
+  section h2 { font-size: 10px !important; line-height: 1.4 !important; }
+  h3 { font-size: 9px !important; }
+
+  /* Container: padding ridotto */
+  .container, .auth-container, .dashboard-container,
+  .cs-wrapper, .dashboard-main { padding: 16px 12px !important; }
+
+  /* Bottoni con tap-target minimo (44px) */
+  .btn, button.btn, a.btn,
+  button[type="submit"], input[type="submit"] {
+    min-height: 44px;
+    padding: 12px 16px !important;
+    font-size: 9px !important;
+    letter-spacing: 1.5px !important;
+  }
+}
+
+/* ── Phone portrait (<= 640px) ───────────────────────────────────────── */
+@media (max-width: 640px) {
+  html, body { font-size: 16px; }
+
+  /* Titoli ancora più piccoli per non andare a capo male */
+  h1, .header h1, .dashboard-header h1 { font-size: 11px !important; letter-spacing: 0.5px !important; }
+  h1, .cs-title { word-spacing: -2px; }
+  section h2 { font-size: 9px !important; letter-spacing: 0.5px !important; }
+  h3 { font-size: 8px !important; }
+
+  /* Body pattern: alleggerisci (i pattern fitti pesano sui GPU mobile) */
+  body::before {
+    background-size: 32px 32px, 16px 16px !important;
+    opacity: 0.6;
+  }
+
+  /* Section / card: padding ridotto, ombre meno spesse */
+  section, .class-card, .invitation-card, .leaderboard-card,
+  .match-history-card, .tourn-card, .player-tile, .match-tile,
+  .dashboard-main section, .winner-banner {
+    padding: 14px 12px !important;
+    box-shadow:
+      inset -2px -2px 0 0 rgba(0,0,0,0.5),
+      inset  2px  2px 0 0 rgba(255,255,255,0.05),
+      0 3px 0 var(--px-shadow) !important;
+  }
+
+  /* Pixel corner L: più piccoli */
+  .dashboard-main section::before,
+  .dashboard-main section::after {
+    width: 6px; height: 6px;
+  }
+
+  /* Bottoni: bordi più sottili, padding compatto, font leggermente più piccolo */
+  .btn, button.btn, a.btn,
+  button[type="submit"], input[type="submit"] {
+    font-size: 8px !important;
+    letter-spacing: 1px !important;
+    padding: 11px 14px !important;
+    box-shadow:
+      inset -2px -2px 0 0 rgba(0,0,0,0.45),
+      inset  2px  2px 0 0 rgba(255,255,255,0.10),
+      0 3px 0 var(--px-shadow) !important;
+  }
+  .btn:active {
+    transform: translateY(3px) !important;
+  }
+
+  /* Pills / badges */
+  .pill, .pill-running, .pill-completed { font-size: 6px !important; padding: 3px 6px !important; }
+
+  /* Input touch-friendly: 16px min font impedisce zoom su iOS */
+  input, select, textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+    padding: 10px 12px !important;
+  }
+
+  /* Class cards (character-select): grid 2-colonne, card più compatte */
+  .classes-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .class-card {
+    width: auto !important;
+    padding: 14px 10px !important;
+    min-height: 130px;
+  }
+  .class-icon { font-size: 36px !important; }
+  .class-name { font-size: 8px !important; letter-spacing: 0.5px !important; margin-top: 6px !important; }
+  .stat-bar { height: 7px !important; }
+
+  /* Tournament size buttons → griglia mobile */
+  .size-btn {
+    font-size: 8px !important;
+    padding: 10px 8px !important;
+    min-height: 44px;
+  }
+
+  /* CTA banner tornei */
+  .cta-banner {
+    font-size: 9px !important;
+    padding: 10px 12px !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Status overlay del game */
+  .status-message { font-size: 12px !important; letter-spacing: 1px !important; }
+
+  /* Disabilita la scanline pesante sui telefoni piccoli (risparmia GPU) */
+  body::after {
+    background-size: 100% 3px !important;
+    opacity: 0.7;
+  }
+
+  /* Section corner decorations: nascondi su mobile per leggibilità */
+  .dashboard-main section::before,
+  .dashboard-main section::after {
+    display: none;
+  }
+}
+
+/* ── Phone piccoli (<= 380px) — fallback estremo ─────────────────────── */
+@media (max-width: 380px) {
+  html, body { font-size: 15px; }
+  h1, .header h1, .dashboard-header h1 { font-size: 10px !important; }
+  section h2 { font-size: 8px !important; }
+
+  .btn, button.btn, a.btn {
+    font-size: 7px !important;
+    padding: 10px 12px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .classes-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .class-card { padding: 12px 8px !important; min-height: 120px; }
+  .class-icon { font-size: 32px !important; }
+
+  /* Riduci ulteriormente il pattern di fondo per perf */
+  body::before { background-size: 40px 40px, 20px 20px !important; opacity: 0.4; }
+}
+
+/* ── Landscape mobile bassa: HUD/menu ancora più compatti ────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .dashboard-header, .header { padding: 6px 12px !important; }
+  h1, .dashboard-header h1 { font-size: 9px !important; }
+  .cs-wrapper { padding: 12px 16px !important; }
+  .cs-title { font-size: 10px !important; margin-bottom: 4px !important; }
+  .cs-sub { margin-bottom: 14px !important; }
+  .classes-grid { grid-template-columns: repeat(5, 1fr) !important; }
+  .class-card { padding: 10px 8px !important; min-height: 110px; }
+  .class-icon { font-size: 28px !important; }
+}
+
+/* ── Riduci motion (preferenze utente) ───────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  body::after { display: none !important; }
+}
