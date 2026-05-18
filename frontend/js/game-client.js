@@ -214,6 +214,13 @@ const PU = {
   shield:      { icon:'🛡', color:'#4488ff', label:'SHIELD' }
 };
 
+// Direzione di sguardo per player (1 = destra, -1 = sinistra).
+// Si aggiorna solo quando il player si muove abbastanza: se sta fermo
+// (vx ~ 0) mantiene l'ultimo facing — niente "wobble" tra frame.
+// Default sensato: P1 guarda a destra (verso il centro), P2 guarda a sinistra.
+const playerFacing = { 1: 1, 2: -1 };
+const FACING_THRESHOLD = 0.3;
+
 let stars = [];
 function initStars(W,H){
   stars=[];
@@ -644,8 +651,12 @@ function drawPlayer(p){
   const spriteScale = Math.max(2, Math.round(p.radius * 0.16) * 2); // 2,4,6,...
   const sw = sprite.width  * spriteScale / SPRITE_PIXEL;
   const sh = sprite.height * spriteScale / SPRITE_PIXEL;
-  // Flip orizzontale in base alla direzione di movimento (so chi sei e dove guardi)
-  const facing = (p.num === 2) ? -1 : 1;
+  // Flip orizzontale in base alla direzione di MOVIMENTO reale (vx del server).
+  // Se vx > soglia → guarda a destra; se vx < -soglia → guarda a sinistra.
+  // Se ~0 (fermo o solo verticale) → mantieni l'ultimo facing.
+  if (p.vx > FACING_THRESHOLD)       playerFacing[p.num] = 1;
+  else if (p.vx < -FACING_THRESHOLD) playerFacing[p.num] = -1;
+  const facing = playerFacing[p.num] || 1;
   const sx = p.x - sw/2;
   const sy = p.y - sh/2 - 2;
 
