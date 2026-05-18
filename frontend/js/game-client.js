@@ -224,7 +224,99 @@ const FACING_THRESHOLD = 0.3;
 let stars = [];
 function initStars(W,H){
   stars=[];
-  for(let i=0;i<160;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+.2,a:Math.random()*.85+.15});
+  // Tre layer di parallasse per uno spazio profondo
+  for(let i=0;i<200;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+.2,a:Math.random()*.85+.15,layer:Math.floor(Math.random()*3)});
+}
+
+// ─── DECOR DI MAPPA — stato persistente per oggetti animati ───
+const mapDecor = {
+  clouds: [],     // platforms
+  birds: [],      // platforms
+  asteroids: [],  // space
+  embers: [],     // volcano
+  buildings: [],  // arena
+  trees: [],      // platforms (alberi distanti)
+  smokes: [],     // volcano (fumo)
+  shootingStars: [], // space
+};
+
+// Pseudo-random deterministico semplice (per layout stabile entro la stessa mappa)
+function _rand(seed){ const x = Math.sin(seed*9301+49297)*233280; return x - Math.floor(x); }
+
+function initMapDecor(mapId, W, H){
+  const D = mapDecor;
+  D.clouds = []; D.birds = []; D.asteroids = []; D.embers = [];
+  D.buildings = []; D.trees = []; D.smokes = []; D.shootingStars = [];
+
+  if (mapId === 'arena'){
+    // Skyline cyberpunk: edifici di altezze varie con finestre lit
+    let x = 0;
+    let i = 0;
+    while (x < W){
+      const w = 30 + Math.floor(_rand(i+1)*40);
+      const h = 60 + Math.floor(_rand(i+2)*120);
+      const windows = [];
+      // Griglia di finestre random (lit on/off)
+      for (let wy = 16; wy < h - 8; wy += 12){
+        for (let wx = 6; wx < w - 6; wx += 10){
+          if (_rand(i*99 + wy + wx) > 0.45) windows.push({ x: wx, y: wy });
+        }
+      }
+      D.buildings.push({ x, w, h, windows, hue: 0.5 + _rand(i+5)*0.2 });
+      x += w + 4 + Math.floor(_rand(i+9)*8);
+      i++;
+    }
+  }
+  else if (mapId === 'platforms'){
+    // Nuvole pixel a layer
+    for (let i = 0; i < 6; i++){
+      mapDecor.clouds.push({
+        x: _rand(i+1)*W, y: 20 + _rand(i+2)*90,
+        w: 28 + Math.floor(_rand(i+3)*30),
+        speed: 0.15 + _rand(i+4)*0.25,
+        layer: i % 2
+      });
+    }
+    // Alberi distanti
+    for (let i = 0; i < 14; i++){
+      D.trees.push({ x: _rand(i+10)*W, h: 40 + _rand(i+11)*30 });
+    }
+    // Uccelli (animati)
+    for (let i = 0; i < 3; i++){
+      D.birds.push({ x: _rand(i+30)*W, y: 50 + _rand(i+31)*60, phase: _rand(i+32)*Math.PI*2, speed: 0.4 + _rand(i+33)*0.3 });
+    }
+  }
+  else if (mapId === 'space'){
+    // Asteroidi sospesi (drift lento)
+    for (let i = 0; i < 6; i++){
+      D.asteroids.push({
+        x: _rand(i+1)*W, y: 40 + _rand(i+2)*(H*0.55),
+        size: 6 + Math.floor(_rand(i+3)*8),
+        vx: (_rand(i+4) - 0.5) * 0.3,
+        vy: (_rand(i+5) - 0.5) * 0.15,
+      });
+    }
+    // Shooting stars
+    for (let i = 0; i < 2; i++){
+      D.shootingStars.push({ x: _rand(i+40)*W, y: _rand(i+41)*(H*0.4), life: -_rand(i+42)*500 });
+    }
+  }
+  else if (mapId === 'volcano'){
+    // Braci che volano via dal vulcano
+    for (let i = 0; i < 28; i++){
+      D.embers.push({
+        x: _rand(i+1)*W, y: _rand(i+2)*H,
+        vx: -0.2 - _rand(i+3)*0.5,
+        vy: -0.3 - _rand(i+4)*0.6,
+        size: 2 + Math.floor(_rand(i+5)*2),
+        life: _rand(i+6)*100
+      });
+    }
+    // Nuvole di fumo scuro
+    for (let i = 0; i < 4; i++){
+      D.smokes.push({ x: _rand(i+50)*W, y: 30 + _rand(i+51)*80, speed: 0.1 + _rand(i+52)*0.2, w: 50 + Math.floor(_rand(i+53)*30) });
+    }
+  }
 }
 
 // ─── Weapon Images Cache ───
@@ -308,6 +400,7 @@ function connect(){
         p2emoji.textContent = gameState.player2.emoji;
         p2name.textContent  = gameState.player2.name.toUpperCase();
         initStars(canvas.logicalW, canvas.logicalH);
+        initMapDecor(currentMapId, canvas.logicalW, canvas.logicalH);
         loadWeaponImages();
         hideStatus();
         startGameLoop();
@@ -411,17 +504,8 @@ function render(){
   ctx.shadowColor = 'transparent';
   ctx.setLineDash([]);
 
-  // ── Background ──
-  ctx.fillStyle = style.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  if(currentMapId === 'space') drawStars(W, H, t);
-
-  // Grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.015)';
-  ctx.lineWidth = 1;
-  for(let x=0;x<=W;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
-  for(let y=0;y<=H;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  // ── Background pixel-art per mappa (gradiente cielo + scenografia) ──
+  drawMapBackground(currentMapId, W, H, t);
 
   // ── Ground (pixel tile floor con bordo "grass/sand/lava crust") ──
   if(hasGround){
@@ -503,6 +587,397 @@ function drawPixelBlock(x, y, w, h, style, isPlatform){
   ctx.fillRect(x + w - px, y, px, h);
 }
 
+// ─── MAP BACKGROUND ROUTER ───────────────────────────────────────────────
+// Per ogni mappa: gradiente di sfondo + scenografia pixel-art animata.
+// Chiamato all'inizio di render(), prima di ground/platform/obstacles.
+function drawMapBackground(mapId, W, H, t){
+  if (mapId === 'arena')         drawArenaBg(W, H, t);
+  else if (mapId === 'platforms')drawPlatformsBg(W, H, t);
+  else if (mapId === 'space')    drawSpaceBg(W, H, t);
+  else if (mapId === 'volcano')  drawVolcanoBg(W, H, t);
+  else {
+    ctx.fillStyle = (MAP_STYLE[mapId]||MAP_STYLE.arena).bg;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+// Gradiente verticale a "bande" pixel (no smooth, look retro)
+function drawPixelSkyGradient(W, H, colors, bandSize = 8){
+  // colors: array di colori dal top al bottom
+  const total = H;
+  const stops = colors.length;
+  const bandsPerStop = Math.ceil(total / (stops * bandSize));
+  let y = 0;
+  for (let s = 0; s < stops - 1; s++){
+    for (let b = 0; b < bandsPerStop; b++){
+      const tt = b / bandsPerStop;
+      ctx.fillStyle = lerpColor(colors[s], colors[s+1], tt);
+      ctx.fillRect(0, y, W, bandSize);
+      y += bandSize;
+      if (y > total) return;
+    }
+  }
+  ctx.fillStyle = colors[stops-1];
+  ctx.fillRect(0, y, W, total - y);
+}
+
+function lerpColor(a, b, t){
+  // a,b in formato #rrggbb
+  const ai = parseInt(a.slice(1),16), bi = parseInt(b.slice(1),16);
+  const ar=(ai>>16)&255, ag=(ai>>8)&255, ab=ai&255;
+  const br=(bi>>16)&255, bg=(bi>>8)&255, bb=bi&255;
+  const r = Math.round(ar + (br-ar)*t);
+  const g = Math.round(ag + (bg-ag)*t);
+  const bl= Math.round(ab + (bb-ab)*t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ARENA — cyberpunk skyline con neon e scan-lines
+// ═══════════════════════════════════════════════════════════════════════
+function drawArenaBg(W, H, t){
+  // Sky gradient blu/viola scuro
+  drawPixelSkyGradient(W, H, ['#0a0e22', '#1a1638', '#2a1a48', '#1a1030'], 12);
+
+  // Stelle/luci lontane (statiche)
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let i = 0; i < 40; i++){
+    const x = Math.round(_rand(i+100)*W);
+    const y = Math.round(_rand(i+101)*H*0.5);
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // Luna pixel in alto a destra
+  ctx.fillStyle = '#f0e8d8';
+  drawPixelCircle(W - 80, 60, 18, '#f0e8d8');
+  ctx.fillStyle = 'rgba(80,80,120,0.55)';
+  drawPixelCircle(W - 72, 54, 6, 'rgba(80,80,120,0.55)');
+
+  // Skyline cyberpunk
+  for (const b of mapDecor.buildings){
+    // Corpo edificio
+    ctx.fillStyle = '#0a1020';
+    ctx.fillRect(b.x, 250 - b.h, b.w, b.h);
+    // Top antenna su alcuni edifici
+    if (b.h > 130){
+      ctx.fillStyle = '#1a2238';
+      ctx.fillRect(b.x + b.w/2 - 2, 250 - b.h - 14, 4, 14);
+      // Lucina rossa pulsante in cima
+      if ((Math.floor(t*2) % 2) === 0){
+        ctx.fillStyle = '#ff3050';
+        ctx.fillRect(b.x + b.w/2 - 2, 250 - b.h - 18, 4, 4);
+      }
+    }
+    // Finestre lit (alcune sfarfallano)
+    for (const w of b.windows){
+      const flicker = (Math.sin(t*3 + b.x + w.y) > 0.85) ? 0 : 1;
+      if (!flicker) continue;
+      // Colore variabile: cyan/giallo/rosa
+      const winColors = ['#00d4ff', '#ffbe00', '#ff66cc'];
+      const c = winColors[(w.x + w.y) % 3];
+      ctx.fillStyle = c;
+      ctx.fillRect(b.x + w.x, 250 - b.h + w.y, 4, 6);
+    }
+    // Bordo top
+    ctx.fillStyle = '#1e3050';
+    ctx.fillRect(b.x, 250 - b.h, b.w, 2);
+  }
+
+  // Scan-line orizzontale che scorre dall'alto (effetto "screen")
+  const scanY = Math.floor((t * 60) % H);
+  ctx.fillStyle = 'rgba(0,212,255,0.08)';
+  ctx.fillRect(0, scanY, W, 2);
+
+  // Floor neon strip (sotto, prima del ground)
+  ctx.fillStyle = 'rgba(0,212,255,0.15)';
+  ctx.fillRect(0, 250, W, 4);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PLATFORMS — foresta di giorno con cielo, nuvole, sole, alberi, uccelli
+// ═══════════════════════════════════════════════════════════════════════
+function drawPlatformsBg(W, H, t){
+  // Cielo gradiente giorno
+  drawPixelSkyGradient(W, H, ['#5fb8ff', '#8ed0ff', '#c8e4ff', '#dde8d8'], 10);
+
+  // Sole pixel-art con raggi
+  const sunX = 120, sunY = 70;
+  ctx.fillStyle = 'rgba(255,220,120,0.25)';
+  drawPixelCircle(sunX, sunY, 28, 'rgba(255,220,120,0.25)');
+  drawPixelCircle(sunX, sunY, 20, '#ffe480');
+  drawPixelCircle(sunX, sunY, 14, '#fff4b0');
+
+  // Montagne lontane (strato 1, viola/blu)
+  ctx.fillStyle = '#7a8db8';
+  drawPixelMountainRange(W, 280, [55, 80, 65, 95, 75, 110, 60, 90, 70, 50]);
+  // Strato 2 (verde scuro)
+  ctx.fillStyle = '#4a6a52';
+  drawPixelMountainRange(W, 320, [40, 60, 50, 70, 45, 80, 55, 65]);
+
+  // Alberi distanti (silhouette)
+  for (const tr of mapDecor.trees){
+    drawPixelTree(tr.x, 330, tr.h);
+  }
+
+  // Nuvole pixel (in movimento)
+  for (const c of mapDecor.clouds){
+    c.x += c.speed * 0.6;
+    if (c.x > W + 60) c.x = -60;
+    drawPixelCloud(c.x, c.y, c.w, c.layer);
+  }
+
+  // Uccelli a "V"
+  for (const bird of mapDecor.birds){
+    bird.x += bird.speed;
+    if (bird.x > W + 20) bird.x = -20;
+    const flap = Math.sin(t * 6 + bird.phase) > 0;
+    drawPixelBird(bird.x, bird.y, flap);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SPACE — cosmo profondo con stelle a layer, pianeta, nebulosa, asteroidi
+// ═══════════════════════════════════════════════════════════════════════
+function drawSpaceBg(W, H, t){
+  // Sfondo gradiente nero/viola scuro
+  drawPixelSkyGradient(W, H, ['#02020f', '#0a0420', '#10082c', '#180a38'], 14);
+
+  // Nebulosa: blob viola/rosa molto translucidi
+  drawNebula(W*0.25, H*0.35, 70, '#9050ff', 0.18);
+  drawNebula(W*0.75, H*0.55, 60, '#ff5099', 0.12);
+  drawNebula(W*0.5,  H*0.2,  90, '#5070ff', 0.10);
+
+  // Pianeta lontano (in alto a destra) con anello
+  const px = W - 110, py = 95;
+  drawPixelCircle(px, py, 30, '#2a1a4a');
+  drawPixelCircle(px - 6, py - 6, 24, '#5a3a8a');
+  drawPixelCircle(px - 10, py - 10, 14, '#a070d8');
+  // Anello orizzontale (ellisse pixelata semplice)
+  ctx.fillStyle = '#b8a0e0';
+  for (let dx = -42; dx <= 42; dx += 4){
+    const ey = py + Math.round(Math.sin(dx*0.05 + 1.4)*4);
+    ctx.fillRect(px + dx, ey, 4, 2);
+  }
+
+  // Stelle pixel a 3 layer (parallasse leggera con t)
+  drawStars(W, H, t);
+
+  // Asteroidi che ruotano e driftano lentamente
+  for (const a of mapDecor.asteroids){
+    a.x += a.vx; a.y += a.vy;
+    if (a.x < -20) a.x = W + 20;
+    if (a.x > W + 20) a.x = -20;
+    if (a.y < -20) a.y = H + 20;
+    if (a.y > H * 0.7) a.y = -20;
+    drawPixelAsteroid(a.x, a.y, a.size);
+  }
+
+  // Shooting stars
+  for (const ss of mapDecor.shootingStars){
+    ss.life += 1;
+    if (ss.life > 0 && ss.life < 40){
+      const tailLen = 40 - ss.life;
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      for (let i = 0; i < tailLen; i++){
+        ctx.globalAlpha = (tailLen - i) / tailLen * 0.8;
+        ctx.fillRect(Math.round(ss.x + i*3), Math.round(ss.y + i*1.5), 2, 2);
+      }
+      ctx.globalAlpha = 1;
+    } else if (ss.life > 80 + _rand(ss.x)*200){
+      // Reset
+      ss.x = _rand(t)*W*0.6;
+      ss.y = _rand(t+1)*H*0.3;
+      ss.life = 0;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// VOLCANO — cielo rosso scuro, vulcano distante, braci che salgono, fumo
+// ═══════════════════════════════════════════════════════════════════════
+function drawVolcanoBg(W, H, t){
+  // Sky gradient ross-fuoco scuro
+  drawPixelSkyGradient(W, H, ['#1a0210', '#3a0a18', '#5a1a18', '#3a0a08'], 12);
+
+  // Luna rossa
+  ctx.fillStyle = '#ff5028';
+  drawPixelCircle(W - 80, 55, 14, '#ff5028');
+  drawPixelCircle(W - 84, 50, 8, '#ff7c4a');
+
+  // Vulcano distante (triangolo pixel con punta che brilla)
+  const vx = W * 0.7, vy = 280;
+  // Profilo del vulcano
+  ctx.fillStyle = '#1a0a08';
+  drawPixelCone(vx, vy, 200, 140);
+  // Crater glow
+  ctx.fillStyle = '#ff8030';
+  ctx.fillRect(vx - 12, vy - 140 + 4, 24, 4);
+  ctx.fillStyle = '#ffd060';
+  ctx.fillRect(vx - 8, vy - 140 + 4, 16, 2);
+  // Lava che cola lungo i fianchi
+  ctx.fillStyle = '#ff4010';
+  ctx.fillRect(vx - 6, vy - 130, 4, 30);
+  ctx.fillRect(vx + 8, vy - 120, 4, 22);
+
+  // Vulcano più piccolo sullo sfondo a sinistra
+  ctx.fillStyle = '#0a0404';
+  drawPixelCone(W * 0.18, 290, 130, 90);
+
+  // Strato di nuvole di fumo nere/grigio scuro
+  for (const sm of mapDecor.smokes){
+    sm.x += sm.speed;
+    if (sm.x > W + 80) sm.x = -80;
+    drawPixelCloud(sm.x, sm.y, sm.w, 0, '#2a1818', '#1a0a0a');
+  }
+
+  // Braci che salgono (luminescenti)
+  for (const e of mapDecor.embers){
+    e.x += e.vx;
+    e.y += e.vy;
+    e.life += 1;
+    if (e.y < -10 || e.x < -10 || e.x > W + 10 || e.life > 220){
+      // respawn
+      e.x = _rand(e.life)*W;
+      e.y = H + _rand(e.life+1)*20;
+      e.vx = -0.2 - _rand(e.life+2)*0.5;
+      e.vy = -0.3 - _rand(e.life+3)*0.6;
+      e.life = 0;
+    }
+    const alpha = 1 - (e.life / 220);
+    ctx.globalAlpha = alpha;
+    // Pixel color: rosso brillante → arancione → giallo
+    const phase = e.life / 220;
+    let color = '#ff4010';
+    if (phase < 0.3) color = '#ffd060';
+    else if (phase < 0.7) color = '#ff8020';
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(e.x), Math.round(e.y), e.size, e.size);
+  }
+  ctx.globalAlpha = 1;
+
+  // Heat haze: bande translucide ondulate vicino al ground
+  ctx.fillStyle = 'rgba(255,100,40,0.06)';
+  for (let i = 0; i < 8; i++){
+    const wy = 380 + i*8 + Math.round(Math.sin(t*2 + i)*3);
+    ctx.fillRect(0, wy, W, 2);
+  }
+}
+
+// ─── Pixel-art helpers ───────────────────────────────────────────────────
+
+// Cerchio "pixel" approssimato (Bresenham semplificato — fillRect 4x4)
+function drawPixelCircle(cx, cy, r, color){
+  ctx.fillStyle = color;
+  const step = 2;
+  for (let y = -r; y <= r; y += step){
+    const xx = Math.floor(Math.sqrt(r*r - y*y));
+    ctx.fillRect(Math.round(cx - xx), Math.round(cy + y), xx*2, step);
+  }
+}
+
+// Range di montagne pixelate: linea spezzata con larghezza fissa per "picco"
+function drawPixelMountainRange(W, baseY, heights){
+  const peakW = Math.ceil(W / (heights.length - 1));
+  // disegna come triangoli pixel approssimati
+  for (let i = 0; i < heights.length - 1; i++){
+    const x0 = i * peakW;
+    const h0 = heights[i];
+    const h1 = heights[i+1];
+    // Fill area sotto il segmento di linea
+    for (let dx = 0; dx < peakW; dx += 4){
+      const tt = dx / peakW;
+      const h = Math.round(h0 + (h1 - h0) * tt);
+      ctx.fillRect(x0 + dx, baseY - h, 4, h + 80);
+    }
+  }
+}
+
+// Albero pixel (pino verde scuro silhouette)
+function drawPixelTree(x, baseY, h){
+  // tronco
+  ctx.fillStyle = '#3a2818';
+  ctx.fillRect(Math.round(x - 2), Math.round(baseY - 8), 4, 12);
+  // chioma triangolare a strati
+  ctx.fillStyle = '#2a5a2a';
+  const levels = 4;
+  for (let i = 0; i < levels; i++){
+    const w = (levels - i) * 6;
+    const ly = baseY - 8 - (levels - i) * 6 - i*2;
+    ctx.fillRect(Math.round(x - w/2), ly, w, 4);
+  }
+  // punta
+  ctx.fillRect(Math.round(x - 2), baseY - 8 - levels*8, 4, 4);
+}
+
+// Nuvola pixel-art (3 file di rettangoli sovrapposti)
+function drawPixelCloud(x, y, w, layer, mainColor, edgeColor){
+  const main = mainColor || (layer === 1 ? '#f8fafe' : '#ffffff');
+  const edge = edgeColor || (layer === 1 ? '#c8d0e0' : '#d8e0f0');
+  ctx.fillStyle = edge;
+  ctx.fillRect(x, y, w, 4);
+  ctx.fillRect(x - 4, y + 4, w + 8, 4);
+  ctx.fillRect(x - 8, y + 8, w + 16, 4);
+  ctx.fillRect(x - 4, y + 12, w + 8, 4);
+  ctx.fillStyle = main;
+  ctx.fillRect(x + 2, y + 2, w - 4, 12);
+  ctx.fillRect(x - 2, y + 6, w + 4, 6);
+}
+
+// Uccello pixel a "V" (animato col flap)
+function drawPixelBird(x, y, flap){
+  ctx.fillStyle = '#1a1a2a';
+  if (flap){
+    // ali in alto
+    ctx.fillRect(x - 4, y - 2, 2, 2);
+    ctx.fillRect(x - 2, y, 2, 2);
+    ctx.fillRect(x + 0, y + 2, 2, 2);
+    ctx.fillRect(x + 2, y, 2, 2);
+    ctx.fillRect(x + 4, y - 2, 2, 2);
+  } else {
+    // ali in basso
+    ctx.fillRect(x - 4, y + 2, 2, 2);
+    ctx.fillRect(x - 2, y, 2, 2);
+    ctx.fillRect(x + 0, y - 2, 2, 2);
+    ctx.fillRect(x + 2, y, 2, 2);
+    ctx.fillRect(x + 4, y + 2, 2, 2);
+  }
+}
+
+// Cono di vulcano pixel
+function drawPixelCone(cx, baseY, baseW, h){
+  for (let dy = 0; dy < h; dy += 4){
+    const tt = dy / h;
+    const w = Math.round(baseW * (1 - tt));
+    ctx.fillRect(Math.round(cx - w/2), baseY - dy - 4, w, 4);
+  }
+}
+
+// Nebulosa: blob translucido con dithering
+function drawNebula(cx, cy, r, color, alpha){
+  ctx.globalAlpha = alpha;
+  drawPixelCircle(cx, cy, r, color);
+  ctx.globalAlpha = alpha * 0.6;
+  drawPixelCircle(cx - r*0.3, cy + r*0.2, r*0.7, color);
+  ctx.globalAlpha = alpha * 0.4;
+  drawPixelCircle(cx + r*0.4, cy - r*0.3, r*0.5, color);
+  ctx.globalAlpha = 1;
+}
+
+// Asteroide pixel (forma irregolare con shading)
+function drawPixelAsteroid(x, y, size){
+  ctx.fillStyle = '#4a4258';
+  // forma "tondeggiante" approssimata
+  ctx.fillRect(x - size, y - size/2, size*2, size);
+  ctx.fillRect(x - size/2, y - size, size, size*2);
+  // shading luce alto-sinistra
+  ctx.fillStyle = '#6a627a';
+  ctx.fillRect(x - size, y - size/2, size, size/2);
+  // crateri
+  ctx.fillStyle = '#2a2238';
+  ctx.fillRect(x - 2, y, 2, 2);
+  ctx.fillRect(x + 2, y - 2, 2, 2);
+}
+
 // ─── PIXEL GROUND — tile sul fondo con "crust" decorativa per mappa ───
 function drawPixelGround(W, H, groundY, mapId, style){
   const px = 4;
@@ -567,10 +1042,14 @@ function drawLava(W,H,lavaY,t){
 
 // ─── STARS (pixel-quadrate) ───
 function drawStars(W,H,t){
+  // 3 layer: lontane (piccole, blu), medie (bianche), vicine (giallo/grandi)
+  const layerColors = ['#7a90c8', '#ffffff', '#fff4c0'];
+  const layerSizes  = [2, 2, 4];
   for(const s of stars){
-    ctx.globalAlpha = s.a*(0.65+0.35*Math.sin(t*1.2+s.x*.01));
-    ctx.fillStyle='#fff';
-    const sz = s.r > 1 ? 4 : 2; // due taglie pixel
+    const twinkle = 0.6 + 0.4 * Math.sin(t*1.5 + s.x*.02 + s.y*.03);
+    ctx.globalAlpha = s.a * twinkle;
+    ctx.fillStyle = layerColors[s.layer] || '#fff';
+    const sz = layerSizes[s.layer] || 2;
     ctx.fillRect(Math.round(s.x), Math.round(s.y), sz, sz);
   }
   ctx.globalAlpha=1;
