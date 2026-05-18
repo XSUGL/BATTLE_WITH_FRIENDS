@@ -23,6 +23,18 @@ let joinTimeoutId = null;
 
 const canvas        = document.getElementById('gameCanvas');
 const ctx           = canvas.getContext('2d');
+// ─── PIXEL-ART PIPELINE ───────────────────────────────────────────────────
+// Backing buffer is 400x250 (half of the 800x500 game space). We scale the
+// context by 0.5 so all existing draw code can keep using 0..800 / 0..500
+// coordinates, but every primitive lands on a 400x250 buffer that the
+// browser upscales to fit via `image-rendering: pixelated` → chunky look
+// across players, weapons, terrain, particles. No per-draw refactor needed.
+const PIXEL_SCALE = 0.5;
+ctx.scale(PIXEL_SCALE, PIXEL_SCALE);
+ctx.imageSmoothingEnabled = false;
+// Expose the *logical* canvas size so existing render code still sees 800x500
+canvas.logicalW = 800;
+canvas.logicalH = 500;
 const timerEl       = document.getElementById('timer');
 const hpBar1        = document.getElementById('hpBar1');
 const hpBar2        = document.getElementById('hpBar2');
@@ -48,6 +60,152 @@ const MAP_STYLE = {
   space:    { bg:'#02020f', groundColor:'rgba(100,100,255,0.3)',platFill:'rgba(130,80,255,0.7)', platBorder:'#9050ff', obsFill:'#1a0a4a', obsBorder:'#9050ff', obsStripe:'rgba(140,80,255,0.3)' },
   volcano:  { bg:'#110400', groundColor:'rgba(255,80,0,0.8)',   platFill:'rgba(200,70,15,0.8)',  platBorder:'#ff6000', obsFill:'#4a1500', obsBorder:'#ff6000', obsStripe:'rgba(255,100,0,0.3)' },
 };
+
+// ─── PIXEL SPRITES (procedural pixel-art per character class) ───
+// Ogni sprite è una griglia 12×16 di codici (0-9). I codici sono mappati alla
+// palette della classe per renderizzare pixel chunky. 0 = trasparente.
+// Codici comuni:
+//   1 = corpo (color principale classe)   2 = ombra (corpo scuro)
+//   3 = luce (corpo chiaro)               4 = outline (#0a0e14)
+//   5 = pelle (#f4c896)                   6 = elmo/cappuccio
+//   7 = accento (oro/argento/dettaglio)   8 = occhi (bianco)
+const PIXEL_SPRITES = {
+  // CAVALIERE — elmo con cresta argentata, visiera
+  knight: [
+    '....7777....',
+    '...766667...',
+    '..76666667..',
+    '.7666666667.',
+    '.6444444446.',  // visiera nera
+    '.6488884486.',  // occhi/visiera
+    '..56666665..',
+    '.13311333331',  // armatura corpo
+    '.13111111131',
+    '.13111111131',
+    '.12111111121',
+    '..211111121.',
+    '...22.22....',
+    '...11.11....',
+    '...11.11....',
+    '..222..222..',
+  ],
+  // GUERRIERO — elmo cornuto, armatura pesante
+  warrior: [
+    '.7.....7....',
+    '.77...77....',
+    '..71111177..',
+    '..71111117..',
+    '.7641114167.',
+    '.7644444467.',
+    '.766666666..',
+    '.13311333331',
+    '113111111131',
+    '113111111131',
+    '.13111111121',
+    '..211111121.',
+    '...22.22....',
+    '..222.222...',
+    '..111.111...',
+    '..222.222...',
+  ],
+  // REAPER — cappuccio scuro, occhi luminosi
+  reaper: [
+    '....6666....',
+    '...666666...',
+    '..66666666..',
+    '.6666666666.',
+    '.6678887766.',  // occhi che brillano
+    '.66888888.66',
+    '..66666666..',
+    '...666666...',
+    '..21111112..',
+    '..21111112..',
+    '..21111112..',
+    '...111111...',
+    '....1.1.....',
+    '....1.1.....',
+    '...22.22....',
+    '..222.222...',
+  ],
+  // RANGER — cappuccio verde + piuma
+  ranger: [
+    '.....77.....',
+    '....677.....',
+    '...66677....',
+    '..6655566...',
+    '.66585856...',
+    '..66666666..',
+    '...555555...',  // viso
+    '..13311333..',
+    '.131111133..',
+    '.121111122..',
+    '..21111112..',
+    '...111111...',
+    '...11..11...',
+    '...11..11...',
+    '...11..11...',
+    '..222..222..',
+  ],
+  // BRAWLER — fascia rossa, muscoli scoperti
+  brawler: [
+    '....5555....',
+    '...555555...',
+    '..55555555..',
+    '..77777777..',  // fascia rossa
+    '..55555555..',
+    '..58588585..',  // occhi
+    '..55555555..',
+    '...555555...',
+    '..1133331...',
+    '.11333333111',  // spalle larghe
+    '.11533335111',
+    '..11555511..',
+    '..11555511..',
+    '...11..11...',
+    '...22..22...',
+    '..222..222..',
+  ],
+};
+
+// Palette per classe (indici 0..9). Generata anche da p.color come fallback.
+const PIXEL_PALETTES = {
+  knight: { 1:'#4fc3f7', 2:'#1976c2', 3:'#90daff', 4:'#0a0e14', 5:'#f4c896', 6:'#c0c8d0', 7:'#e8eff5', 8:'#ffffff' },
+  warrior:{ 1:'#ef9a9a', 2:'#a23737', 3:'#ffd0d0', 4:'#0a0e14', 5:'#f4c896', 6:'#6b3a3a', 7:'#ffd54f', 8:'#ffffff' },
+  reaper: { 1:'#ce93d8', 2:'#6a3a82', 3:'#ecc5f5', 4:'#0a0e14', 5:'#cfa4d8', 6:'#2a1733', 7:'#b066d0', 8:'#ff66ff' },
+  ranger: { 1:'#a5d6a7', 2:'#3d7b40', 3:'#d4f0d5', 4:'#0a0e14', 5:'#f4c896', 6:'#2e6b4e', 7:'#d4a86a', 8:'#ffffff' },
+  brawler:{ 1:'#ffcc80', 2:'#a55a1c', 3:'#ffe6b3', 4:'#0a0e14', 5:'#f4c896', 6:'#d96a3a', 7:'#e23636', 8:'#ffffff' },
+};
+
+// Cache: pre-renderizza ogni sprite su un offscreen canvas così il drawImage
+// in render() è uno shot solo (zero loop nested per-frame).
+const SPRITE_CACHE = {};
+const SPRITE_PIXEL = 2; // ogni cella sprite = 2 logici (= 1 device px dopo PIXEL_SCALE)
+function buildSpriteCanvas(className){
+  const sprite  = PIXEL_SPRITES[className] || PIXEL_SPRITES.knight;
+  const palette = PIXEL_PALETTES[className] || PIXEL_PALETTES.knight;
+  const cols    = sprite[0].length;
+  const rows    = sprite.length;
+  const c = document.createElement('canvas');
+  c.width  = cols * SPRITE_PIXEL;
+  c.height = rows * SPRITE_PIXEL;
+  const cx = c.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  for (let r = 0; r < rows; r++){
+    for (let col = 0; col < cols; col++){
+      const ch = sprite[r][col];
+      if (ch === '.' || ch === '0') continue;
+      const color = palette[ch];
+      if (!color) continue;
+      cx.fillStyle = color;
+      cx.fillRect(col * SPRITE_PIXEL, r * SPRITE_PIXEL, SPRITE_PIXEL, SPRITE_PIXEL);
+    }
+  }
+  return c;
+}
+function getSprite(className){
+  if (!SPRITE_CACHE[className]) SPRITE_CACHE[className] = buildSpriteCanvas(className);
+  return SPRITE_CACHE[className];
+}
 
 const PU = {
   weapon_grow: { icon:'⚡', color:'#ffbe00', label:'+SIZE'  },
@@ -142,7 +300,7 @@ function connect(){
         p1name.textContent  = gameState.player1.name.toUpperCase();
         p2emoji.textContent = gameState.player2.emoji;
         p2name.textContent  = gameState.player2.name.toUpperCase();
-        initStars(canvas.width, canvas.height);
+        initStars(canvas.logicalW, canvas.logicalH);
         loadWeaponImages();
         hideStatus();
         startGameLoop();
@@ -229,7 +387,7 @@ window.addEventListener('beforeunload', () => {
 
 // ─── RENDER ───
 function render(){
-  const W = canvas.width, H = canvas.height;
+  const W = canvas.logicalW, H = canvas.logicalH;
   const t = Date.now()/1000;
   const style = MAP_STYLE[currentMapId] || MAP_STYLE.arena;
 
@@ -258,27 +416,14 @@ function render(){
   for(let x=0;x<=W;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
   for(let y=0;y<=H;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
 
-  // ── Ground ──
+  // ── Ground (pixel tile floor con bordo "grass/sand/lava crust") ──
   if(hasGround){
-    ctx.fillStyle = style.groundColor;
-    ctx.fillRect(0, groundY, W, H - groundY);
-    ctx.strokeStyle = style.groundColor;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+    drawPixelGround(W, H, groundY, currentMapId, style);
   }
 
-  // ── Platforms ──
+  // ── Platforms (pixel-block con dithering e top-light) ──
   for(const p of platforms){
-    ctx.fillStyle = style.platFill;
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    // top highlight
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(p.x+3, p.y+1); ctx.lineTo(p.x+p.w-3, p.y+1); ctx.stroke();
-    // border
-    ctx.strokeStyle = style.platBorder;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(p.x, p.y, p.w, p.h);
+    drawPixelBlock(p.x, p.y, p.w, p.h, style, /*isPlatform=*/true);
   }
 
   // ── Obstacles ──  (coordinate dal server = stessa fisica)
@@ -298,11 +443,12 @@ function render(){
   }
   ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.setLineDash([]);
 
-  // ── Particles ──
+  // ── Particles (pixel-style: quadrate, no antialiasing) ──
   for(const p of (gameState.particles||[])){
     ctx.globalAlpha = p.life / p.maxLife;
     ctx.fillStyle   = p.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+    const s = Math.max(2, Math.round(p.size * 1.4));
+    ctx.fillRect(Math.round(p.x - s/2), Math.round(p.y - s/2), s, s);
   }
   ctx.globalAlpha = 1;
 
@@ -312,53 +458,89 @@ function render(){
   ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 }
 
-// ─── OBSTACLE ─── usa le coordinate esatte passate dal server
+// ─── OBSTACLE (pixel-art con dithering) ───
 function drawObstacle(obs, style, t){
-  const x=obs.x, y=obs.y, w=obs.w, h=obs.h;
+  drawPixelBlock(obs.x, obs.y, obs.w, obs.h, style, /*isPlatform=*/false);
+}
 
-  // body
-  ctx.fillStyle = style.obsFill;
+// ─── PIXEL BLOCK — usato per platform e obstacle ───
+// Riga superiore: colore highlight (top-light a pixel).
+// Riga inferiore: ombra. Resto: fill base + dithering ogni 8 px su pattern checker.
+function drawPixelBlock(x, y, w, h, style, isPlatform){
+  const px = 4; // dimensione "pixel" logico (= 2 device dopo PIXEL_SCALE)
+  const fill   = isPlatform ? style.platFill   : style.obsFill;
+  const border = isPlatform ? style.platBorder : style.obsBorder;
+  const stripe = style.obsStripe;
+
+  // body uniform fill
+  ctx.fillStyle = fill;
   ctx.fillRect(x, y, w, h);
 
-  // stripes clipped
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  ctx.strokeStyle = style.obsStripe;
-  ctx.lineWidth = 7;
-  for(let sx = x - h*2; sx < x + w + h; sx += 16){
-    ctx.beginPath();
-    ctx.moveTo(sx, y+h);
-    ctx.lineTo(sx+h*2, y);
-    ctx.stroke();
+  // dithering — pixel sparsi più scuri ogni cella pari
+  ctx.fillStyle = stripe;
+  for (let dy = 0; dy < h; dy += px*2){
+    for (let dx = ((dy/px)%2 ? 0 : px); dx < w; dx += px*2){
+      ctx.fillRect(x + dx, y + dy, px, px);
+    }
   }
-  ctx.restore();
 
-  // border
-  ctx.strokeStyle = style.obsBorder;
-  ctx.lineWidth   = 2;
-  ctx.strokeRect(x, y, w, h);
+  // top highlight strip (riga di pixel "luce")
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillRect(x, y, w, px);
+  // bottom shadow strip
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(x, y + h - px, w, px);
+  // side borders (colore mappa)
+  ctx.fillStyle = border;
+  ctx.fillRect(x, y, px, h);
+  ctx.fillRect(x + w - px, y, px, h);
+}
 
-  // top highlight
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth   = 2;
-  ctx.beginPath();
-  ctx.moveTo(x+3, y+1);
-  ctx.lineTo(x+w-3, y+1);
-  ctx.stroke();
+// ─── PIXEL GROUND — tile sul fondo con "crust" decorativa per mappa ───
+function drawPixelGround(W, H, groundY, mapId, style){
+  const px = 4;
+  // base fill
+  ctx.fillStyle = style.platFill;
+  ctx.fillRect(0, groundY, W, H - groundY);
 
-  // shimmer
-  ctx.save();
-  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
-  const sx = x + ((t*55) % (w+50)) - 25;
-  const sg = ctx.createLinearGradient(sx, 0, sx+25, 0);
-  sg.addColorStop(0, 'rgba(255,255,255,0)');
-  sg.addColorStop(0.5, 'rgba(255,255,255,0.2)');
-  sg.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = sg;
-  ctx.fillRect(x, y, w, h);
-  ctx.restore();
+  // dithering ground
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  for (let dy = groundY + px*2; dy < H; dy += px*2){
+    for (let dx = ((dy/px)%2 ? 0 : px); dx < W; dx += px*2){
+      ctx.fillRect(dx, dy, px, px);
+    }
+  }
+
+  // crust per mappa: top-row decorato
+  if (mapId === 'platforms'){
+    // erba: blocchi verdi + ciuffi più chiari
+    ctx.fillStyle = '#6fdc6f';
+    ctx.fillRect(0, groundY, W, px);
+    ctx.fillStyle = '#a8f5a8';
+    for (let dx = 0; dx < W; dx += px*3) ctx.fillRect(dx, groundY, px, px);
+  } else if (mapId === 'volcano'){
+    // crust di lava — strisce rosso/giallo che pulsano
+    const t = Date.now()/300;
+    ctx.fillStyle = '#ffb020';
+    ctx.fillRect(0, groundY, W, px);
+    ctx.fillStyle = '#ff4000';
+    for (let dx = 0; dx < W; dx += px*2){
+      const flicker = (Math.sin(t + dx*0.05) > 0) ? px : 0;
+      ctx.fillRect(dx, groundY + flicker, px, px);
+    }
+  } else if (mapId === 'space'){
+    // crust metallico viola con rivetti
+    ctx.fillStyle = '#c090ff';
+    ctx.fillRect(0, groundY, W, px);
+    ctx.fillStyle = '#6030c0';
+    for (let dx = px*2; dx < W; dx += px*4) ctx.fillRect(dx, groundY + px, px, px);
+  } else {
+    // arena: linea cyan luminosa
+    ctx.fillStyle = '#80f0ff';
+    ctx.fillRect(0, groundY, W, px);
+    ctx.fillStyle = style.platBorder;
+    ctx.fillRect(0, groundY + px, W, px);
+  }
 }
 
 // ─── LAVA ───
@@ -376,32 +558,53 @@ function drawLava(W,H,lavaY,t){
   ctx.stroke();
 }
 
-// ─── STARS ───
+// ─── STARS (pixel-quadrate) ───
 function drawStars(W,H,t){
   for(const s of stars){
     ctx.globalAlpha = s.a*(0.65+0.35*Math.sin(t*1.2+s.x*.01));
     ctx.fillStyle='#fff';
-    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+    const sz = s.r > 1 ? 4 : 2; // due taglie pixel
+    ctx.fillRect(Math.round(s.x), Math.round(s.y), sz, sz);
   }
   ctx.globalAlpha=1;
 }
 
-// ─── POWERUP ───
+// ─── POWERUP (cassetta pixel quadrata) ───
 function drawPowerup(pu,t){
   const vis=PU[pu.type]; if(!vis) return;
-  const by=pu.y+Math.sin(t*2.8+pu.id*.001)*5;
-  ctx.strokeStyle=vis.color; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(pu.x,by,pu.radius+6,0,Math.PI*2); ctx.stroke();
-  ctx.fillStyle='rgba(4,8,15,0.75)';
-  ctx.beginPath(); ctx.arc(pu.x,by,pu.radius,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle=vis.color; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.arc(pu.x,by,pu.radius,0,Math.PI*2); ctx.stroke();
-  ctx.font=`${pu.radius+2}px serif`;
+  const by=pu.y+Math.round(Math.sin(t*2.8+pu.id*.001)*5);
+  const r = pu.radius;
+  const px = 4;
+
+  // glow esterno (square ring pulsante)
+  const pulse = (0.5 + 0.5*Math.sin(t*4));
+  ctx.globalAlpha = 0.35 + pulse*0.35;
+  ctx.fillStyle = vis.color;
+  ctx.fillRect(pu.x - r - px*2, by - r - px*2, (r+px*2)*2, px);   // top
+  ctx.fillRect(pu.x - r - px*2, by + r + px,   (r+px*2)*2, px);   // bottom
+  ctx.fillRect(pu.x - r - px*2, by - r - px*2, px, (r+px*2)*2);   // left
+  ctx.fillRect(pu.x + r + px,   by - r - px*2, px, (r+px*2)*2);   // right
+  ctx.globalAlpha = 1;
+
+  // box interna
+  ctx.fillStyle = 'rgba(4,8,15,0.88)';
+  ctx.fillRect(pu.x - r, by - r, r*2, r*2);
+  // bordo colorato
+  ctx.fillStyle = vis.color;
+  ctx.fillRect(pu.x - r, by - r,        r*2, px);          // top
+  ctx.fillRect(pu.x - r, by + r - px,   r*2, px);          // bottom
+  ctx.fillRect(pu.x - r, by - r,        px,  r*2);         // left
+  ctx.fillRect(pu.x + r - px, by - r,   px,  r*2);         // right
+
+  // icona emoji (centered, monospace-ish per coerenza pixel)
+  ctx.font=`${r+4}px serif`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(vis.icon,pu.x,by+1);
+
+  // label sotto
   ctx.font='bold 8px monospace'; ctx.fillStyle=vis.color;
   ctx.globalAlpha=0.8+0.2*Math.sin(t*3);
-  ctx.fillText(vis.label,pu.x,by+pu.radius+12);
+  ctx.fillText(vis.label,pu.x,by+r+10);
   ctx.globalAlpha=1; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
@@ -431,24 +634,48 @@ function drawPlayer(p){
     ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+12,0,Math.PI*2); ctx.stroke();
   }
 
-  // body
-  const g=ctx.createRadialGradient(p.x-p.radius*.3,p.y-p.radius*.3,0,p.x,p.y,p.radius);
-  if(isFlash){
-    g.addColorStop(0,'#fff'); g.addColorStop(.5,'#faa'); g.addColorStop(1,'#f33');
-  } else {
-    g.addColorStop(0,lighten(p.color,.3)); g.addColorStop(.6,p.color); g.addColorStop(1,darken(p.color,.4));
-  }
-  ctx.shadowColor = isFlash?'#fff':(hasDmg?'#ff3333':p.color);
-  ctx.shadowBlur  = isFlash?36:(hasDmg?26:16);
-  ctx.fillStyle   = g;
-  ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2); ctx.fill();
-  ctx.shadowBlur  = 0;
+  // ── PIXEL SPRITE BODY ────────────────────────────────────────────────
+  // Sprite procedurale per classe. Aura/shadow/flash applicati allo sprite,
+  // non più al pallino gradiente. Lo sprite cached è 24×32 pixel (logici).
+  const className = (p.className || p.name || 'knight').toLowerCase();
+  const sprite = getSprite(className);
+  // Dimensione visiva sprite proporzionale al raggio del player. Manteniamo
+  // multipli interi del SPRITE_PIXEL per evitare blur sub-pixel.
+  const spriteScale = Math.max(2, Math.round(p.radius * 0.16) * 2); // 2,4,6,...
+  const sw = sprite.width  * spriteScale / SPRITE_PIXEL;
+  const sh = sprite.height * spriteScale / SPRITE_PIXEL;
+  // Flip orizzontale in base alla direzione di movimento (so chi sei e dove guardi)
+  const facing = (p.num === 2) ? -1 : 1;
+  const sx = p.x - sw/2;
+  const sy = p.y - sh/2 - 2;
 
-  // highlight
-  ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.beginPath();
-  ctx.ellipse(p.x-p.radius*.28,p.y-p.radius*.32,p.radius*.32,p.radius*.18,-0.5,0,Math.PI*2);
-  ctx.fill();
+  // shadow ai piedi (ellisse pixel)
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(p.x - p.radius*0.7, p.y + sh*0.42, p.radius*1.4, 4);
+
+  // glow / hit flash via shadowBlur sul drawImage
+  ctx.shadowColor = isFlash ? '#fff' : (hasDmg ? '#ff3333' : p.color);
+  ctx.shadowBlur  = isFlash ? 30 : (hasDmg ? 22 : 14);
+  ctx.save();
+  if (facing === -1){
+    ctx.translate(p.x, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sprite, -sw/2, sy, sw, sh);
+  } else {
+    ctx.drawImage(sprite, sx, sy, sw, sh);
+  }
+  ctx.restore();
+  ctx.shadowBlur = 0;
+
+  // Hit flash overlay (rosso translucido sopra lo sprite)
+  if (isFlash){
+    ctx.globalAlpha = 0.55;
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = '#ff4444';
+    ctx.fillRect(sx, sy, sw, sh);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
 
   drawWeapons(p,effs);
   ctx.globalAlpha=1; ctx.shadowBlur=0;
@@ -650,8 +877,8 @@ function spawnDamagePopup(canvasX, canvasY, dmg, color){
   // Converti coord canvas (logiche 800x500) in coord CSS dell'arena-wrapper
   const rect = canvas.getBoundingClientRect();
   const wrapRect = arenaWrap.getBoundingClientRect();
-  const scaleX = rect.width  / canvas.width;
-  const scaleY = rect.height / canvas.height;
+  const scaleX = rect.width  / canvas.logicalW;
+  const scaleY = rect.height / canvas.logicalH;
   const cssX = (rect.left - wrapRect.left) + canvasX * scaleX;
   const cssY = (rect.top  - wrapRect.top)  + canvasY * scaleY;
 
@@ -670,8 +897,8 @@ function spawnPickupBurst(canvasX, canvasY, color){
   if (!arenaWrap || !canvas) return;
   const rect = canvas.getBoundingClientRect();
   const wrapRect = arenaWrap.getBoundingClientRect();
-  const scaleX = rect.width  / canvas.width;
-  const scaleY = rect.height / canvas.height;
+  const scaleX = rect.width  / canvas.logicalW;
+  const scaleY = rect.height / canvas.logicalH;
   const cssX = (rect.left - wrapRect.left) + canvasX * scaleX;
   const cssY = (rect.top  - wrapRect.top)  + canvasY * scaleY;
   const el = document.createElement('div');

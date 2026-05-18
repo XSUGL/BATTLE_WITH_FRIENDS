@@ -507,6 +507,8 @@ export class GameState {
       radius: p.radius, hp: p.hp, maxHp: p.maxHp,
       color: p.color, shadowColor: p.shadowColor,
       name: p.name, emoji: p.emoji,
+      // className serve al client per scegliere lo sprite pixel-art corretto
+      className: (p.name || '').toLowerCase(),
       hitFlash: p.hitFlash, dead: p.dead, onGround: p.onGround,
       weapons: p.weapons.map(w => ({
         type: w.type, currentAngle: w.currentAngle,

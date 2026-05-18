@@ -138,7 +138,14 @@ body{
 
 /* ── ARENA ── */
 .arena-wrapper{position:relative;line-height:0}
-#gameCanvas{display:block;width:100%;transition:transform .04s linear}
+#gameCanvas{
+  display:block;width:100%;transition:transform .04s linear;
+  /* Pixel-art look: backing buffer is 2x smaller, browser upscales chunky */
+  image-rendering:pixelated;
+  image-rendering:-moz-crisp-edges;
+  image-rendering:crisp-edges;
+  -ms-interpolation-mode:nearest-neighbor;
+}
 
 /* Screen shake on hit (toggled via class .shake-N) */
 .arena-wrapper.shake-1 #gameCanvas{animation:shake1 .18s ease-out}
