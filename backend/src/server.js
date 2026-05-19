@@ -30,8 +30,21 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files from frontend
-app.use('/webapp2', express.static(frontendPath));
-app.use(express.static(frontendPath));
+// HTML files: no-cache (so the browser always re-checks; ?v=N on CSS/JS busts correctly)
+// CSS/JS/assets: cachabili (sono già versionati via querystring ?v=N)
+const staticOpts = {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (/\.(css|js|png|jpg|jpeg|svg|woff2?)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 giorni
+    }
+  }
+};
+app.use('/webapp2', express.static(frontendPath, staticOpts));
+app.use(express.static(frontendPath, staticOpts));
 
 // Routes
 app.use('/webapp2/api/auth', authRoutes);
