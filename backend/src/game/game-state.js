@@ -319,6 +319,41 @@ export class GameState {
     };
   }
 
+  // ─── HITBOX AABB ──────────────────────────────────────────────────────
+  // Restituisce un rettangolo (AABB) centrato su (p.x, p.y) che copre
+  // l'intero personaggio visibile, NON solo il cerchio fisico.
+  // Le dimensioni rispecchiano lo sprite renderizzato dal client (12×16
+  // celle × spriteScale), con un fattore di "silhouette fill" per stare
+  // dentro al body visibile (no transparent margin).
+  //
+  // Formula (mirror di client getSpriteScale):
+  //   scale  = max(2, round(radius * 0.18) * 2)
+  //   drawW  = 12 * scale,  drawH = 16 * scale  (logical px)
+  //   halfW  ≈ drawW * 0.22  (~ vecchio cerchio, copre fianchi)
+  //   halfH  ≈ drawH * 0.40  (~80% altezza, copre testa→piedi)
+  //
+  // Esempio knight (radius=22 → scale=8): drawW=96, drawH=128 →
+  //   AABB 42×102 invece del vecchio cerchio diametro 44.
+  getHitBox(p) {
+    const scale = Math.max(2, Math.round((p.radius || 12) * 0.18) * 2);
+    const drawW = 12 * scale;
+    const drawH = 16 * scale;
+    return {
+      halfW: drawW * 0.22,
+      halfH: drawH * 0.40,
+    };
+  }
+
+  // Helper: punto P colpisce il body AABB di "target", con un margine
+  // (es. metà larghezza dell'arma) di tolleranza ai bordi.
+  pointHitsBody(px, py, target, margin) {
+    const hb = this.getHitBox(target);
+    return (
+      Math.abs(px - target.x) < hb.halfW + margin &&
+      Math.abs(py - target.y) < hb.halfH + margin
+    );
+  }
+
   checkWeaponCollisions() {
     const now = Date.now();
     const dmgMult1 = this.effects.p1.damage_boost ? 2.2 : 1;
@@ -327,10 +362,10 @@ export class GameState {
     const shield2  = !!this.effects.p2.shield;
 
     for (const w of this.player1.weapons) {
-      const tip  = this.getWeaponTipPosition(this.player1, w);
-      const dist = Math.hypot(tip.x - this.player2.x, tip.y - this.player2.y);
-      const hitRadius = this.player2.radius + (this.effects.p1.weapon_grow ? w.width : w.width / 2);
-      if (dist < hitRadius && now - this.lastHitTime.p2 > this.hitCooldown) {
+      const tip    = this.getWeaponTipPosition(this.player1, w);
+      const margin = this.effects.p1.weapon_grow ? w.width : w.width / 2;
+      if (this.pointHitsBody(tip.x, tip.y, this.player2, margin)
+          && now - this.lastHitTime.p2 > this.hitCooldown) {
         if (!shield2) {
           this.applyDamage(this.player2, w.damage * dmgMult1, tip);
           this.lastHitTime.p2 = now;
@@ -341,10 +376,10 @@ export class GameState {
       }
     }
     for (const w of this.player2.weapons) {
-      const tip  = this.getWeaponTipPosition(this.player2, w);
-      const dist = Math.hypot(tip.x - this.player1.x, tip.y - this.player1.y);
-      const hitRadius = this.player1.radius + (this.effects.p2.weapon_grow ? w.width : w.width / 2);
-      if (dist < hitRadius && now - this.lastHitTime.p1 > this.hitCooldown) {
+      const tip    = this.getWeaponTipPosition(this.player2, w);
+      const margin = this.effects.p2.weapon_grow ? w.width : w.width / 2;
+      if (this.pointHitsBody(tip.x, tip.y, this.player1, margin)
+          && now - this.lastHitTime.p1 > this.hitCooldown) {
         if (!shield1) {
           this.applyDamage(this.player1, w.damage * dmgMult2, tip);
           this.lastHitTime.p1 = now;
@@ -502,6 +537,7 @@ export class GameState {
   }
 
   serializePlayer(p) {
+    const hb = this.getHitBox(p);
     return {
       num: p.num, x: p.x, y: p.y, vx: p.vx, vy: p.vy,
       radius: p.radius, hp: p.hp, maxHp: p.maxHp,
@@ -509,6 +545,10 @@ export class GameState {
       name: p.name, emoji: p.emoji,
       // className serve al client per scegliere lo sprite pixel-art corretto
       className: (p.name || '').toLowerCase(),
+      // hitW/hitH: hitbox AABB visibile (per debug e per disegnare flash
+      // sull'intero corpo, non solo sul cerchio fisico)
+      hitW: hb.halfW * 2,
+      hitH: hb.halfH * 2,
       hitFlash: p.hitFlash, dead: p.dead, onGround: p.onGround,
       weapons: p.weapons.map(w => ({
         type: w.type, currentAngle: w.currentAngle,
