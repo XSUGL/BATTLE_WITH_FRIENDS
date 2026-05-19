@@ -253,11 +253,15 @@ function getSprite(className, frame='idle'){
 
 // Calcola la scala visiva sprite in funzione del raggio.
 // Manteniamo SOLO multipli interi del SPRITE_PIXEL (no blur sub-pixel).
-// Formula: rispetta la dimensione originale dei personaggi (no giant mode).
-// radius=12 → scala 4 (sprite 48×64 logici). I personaggi più "grossi"
-// vengono solo dal power-up weapon_grow / size, non dalla scala base.
+// Formula ridotta a ~metà rispetto a prima (0.10 invece di 0.18) perché
+// gli sprite risultavano enormi rispetto al cerchio fisico → personaggi che
+// camminavano "sotto" le piattaforme (i piedi visivi cadevano sotto la
+// linea di terra fisica). Esempi:
+//   radius=18 (reaper/ranger) → scale 4  (sprite 48×64 logici)
+//   radius=22 (knight)        → scale 4  (sprite 48×64)
+//   radius=26 (warrior)       → scale 6  (sprite 72×96)
 function getSpriteScale(p){
-  return Math.max(2, Math.round((p.radius || 12) * 0.18) * 2); // 4,6,...
+  return Math.max(2, Math.round((p.radius || 12) * 0.10) * 2); // 2,4,6
 }
 // Moltiplicatore base delle armi: indipendente dalla scala personaggio.
 // Le armi sono ~35% più grandi del default originale così riempiono
@@ -1216,9 +1220,12 @@ function drawPlayer(p){
   const drawW = sw * sxScale;
   const drawH = sh * syScale;
   const sx = p.x - drawW / 2;
-  // "ancoraggio piedi": sposto sy in modo che la base resti sul pavimento
-  // anche con syScale variabile. Aggiungo bobY per il piccolo hop walk.
-  const footY = p.y + sh / 2 - 2;
+  // "ancoraggio piedi": i piedi visivi devono coincidere col punto di
+  // contatto fisico col terreno, NON con il centro dello sprite. Il server
+  // colloca il player a p.y con il cerchio fisico che tocca terra a
+  // p.y + p.radius. Quindi i piedi pixel li disegniamo lì, e lo sprite si
+  // estende verso l'alto. Così non camminano più sotto le piattaforme.
+  const footY = p.y + (p.radius || 12);
   const sy = footY - drawH + bobY;
 
   // shadow ai piedi (ellisse pixel) — leggermente più larga sui personaggi grossi

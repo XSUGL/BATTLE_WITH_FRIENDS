@@ -320,27 +320,34 @@ export class GameState {
   }
 
   // ─── HITBOX AABB ──────────────────────────────────────────────────────
-  // Restituisce un rettangolo (AABB) centrato su (p.x, p.y) che copre
-  // l'intero personaggio visibile, NON solo il cerchio fisico.
-  // Le dimensioni rispecchiano lo sprite renderizzato dal client (12×16
-  // celle × spriteScale), con un fattore di "silhouette fill" per stare
-  // dentro al body visibile (no transparent margin).
+  // Restituisce un rettangolo (AABB) che copre l'intero personaggio
+  // visibile (testa → piedi), NON solo il cerchio fisico.
+  // Il rettangolo è ANCORATO AI PIEDI (a p.y + p.radius, il punto di
+  // contatto col terreno) e si estende verso l'alto per drawH. Questo
+  // matcha esattamente come il client disegna lo sprite.
   //
-  // Formula (mirror di client getSpriteScale):
-  //   scale  = max(2, round(radius * 0.18) * 2)
+  // Formula (mirror di client getSpriteScale, ridotta ~½ dopo bug fix):
+  //   scale  = max(2, round(radius * 0.10) * 2)
   //   drawW  = 12 * scale,  drawH = 16 * scale  (logical px)
-  //   halfW  ≈ drawW * 0.22  (~ vecchio cerchio, copre fianchi)
-  //   halfH  ≈ drawH * 0.40  (~80% altezza, copre testa→piedi)
+  //   halfW  ≈ drawW * 0.22  (copre fianchi, ~vecchio cerchio)
+  //   halfH  ≈ drawH * 0.40  (~80% altezza, testa → piedi)
   //
-  // Esempio knight (radius=22 → scale=8): drawW=96, drawH=128 →
-  //   AABB 42×102 invece del vecchio cerchio diametro 44.
+  // Esempi:
+  //   knight  (r=22, scale=4): drawW=48, drawH=64 → AABB 21×51 ancorato ai piedi
+  //   warrior (r=26, scale=6): drawW=72, drawH=96 → AABB 32×77 ancorato ai piedi
   getHitBox(p) {
-    const scale = Math.max(2, Math.round((p.radius || 12) * 0.18) * 2);
+    const r     = p.radius || 12;
+    const scale = Math.max(2, Math.round(r * 0.10) * 2);
     const drawW = 12 * scale;
     const drawH = 16 * scale;
+    const footY = p.y + r;             // contatto col terreno (in coord world)
+    const topY  = footY - drawH;       // top dello sprite
+    const cy    = (footY + topY) / 2;  // centro Y del rettangolo
     return {
       halfW: drawW * 0.22,
       halfH: drawH * 0.40,
+      cx: p.x,
+      cy,
     };
   }
 
@@ -349,8 +356,8 @@ export class GameState {
   pointHitsBody(px, py, target, margin) {
     const hb = this.getHitBox(target);
     return (
-      Math.abs(px - target.x) < hb.halfW + margin &&
-      Math.abs(py - target.y) < hb.halfH + margin
+      Math.abs(px - hb.cx) < hb.halfW + margin &&
+      Math.abs(py - hb.cy) < hb.halfH + margin
     );
   }
 
