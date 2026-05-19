@@ -2,7 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Battle With Friend — Tournament Lobby</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -68,6 +71,183 @@ section h2::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,
 .winner-banner .name{font-size:24px;font-weight:700;color:#fff;letter-spacing:1px;margin-top:4px}
 
 @media(max-width:600px){.bracket{gap:10px}.bracket-round{min-width:170px}}
+</style>
+<link rel="stylesheet" href="css/pixel-theme.css?v=2">
+<style>
+/* ── TOURNAMENT LOBBY PIXEL TWEAKS ───────────────────────────────────── */
+.tourn-title {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 14px !important;
+  letter-spacing: 1px !important;
+  color: #fff !important;
+  text-shadow: 2px 2px 0 var(--px-shadow), 0 0 12px rgba(0,212,255,0.4) !important;
+  line-height: 1.4 !important;
+}
+.tourn-stats { font-family: 'VT323', monospace !important; font-size: 14px !important; letter-spacing: 0.5px !important; }
+
+/* Pills compatti stile arcade */
+.pill { font-family: 'Press Start 2P', monospace !important; font-size: 7px !important; padding: 4px 8px !important; border-radius: 0 !important; border-width: 2px !important; letter-spacing: 1px !important; }
+.pill-running   { background: rgba(255,190,0,0.15) !important; border-color: var(--px-gold) !important; color: var(--px-gold) !important; }
+.pill-completed { background: rgba(0,255,157,0.10) !important; border-color: var(--px-green) !important; color: var(--px-green) !important; }
+
+/* Player tile — più chunky con "seed" come numero arcade */
+.player-tile {
+  padding: 10px 12px !important;
+  background: var(--px-surface) !important;
+  border-radius: 0 !important;
+  position: relative;
+}
+.player-tile.me {
+  outline: 3px solid var(--px-accent) !important;
+  outline-offset: -3px;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-border-d),
+    inset  2px  2px 0 0 rgba(170,240,255,0.18),
+    0 4px 0 var(--px-shadow) !important;
+}
+.player-tile.eliminated {
+  opacity: 0.5 !important;
+  border-style: dashed !important;
+  border-color: var(--px-accent2) !important;
+  background: rgba(255,61,92,0.05) !important;
+}
+.player-tile.eliminated .player-name { text-decoration: line-through; color: var(--px-text2) !important; }
+.player-seed {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 9px !important;
+  color: var(--px-gold) !important;
+  background: var(--px-shadow);
+  padding: 4px 6px;
+  min-width: 28px;
+  text-align: center;
+  border: 2px solid var(--px-gold);
+}
+.player-name { font-family: 'VT323', monospace !important; font-size: 17px !important; color: #fff !important; }
+.empty-slot { font-family: 'Press Start 2P', monospace !important; font-size: 8px !important; color: var(--px-text-dim) !important; }
+
+/* ── BRACKET: pixel "tournament tree" ─────────────────────────────────── */
+.bracket {
+  padding: 12px 4px 8px !important;
+  /* Scrollbar pixel-style */
+  scrollbar-width: thin;
+  scrollbar-color: var(--px-accent) var(--px-bg);
+}
+.bracket::-webkit-scrollbar { height: 8px; }
+.bracket::-webkit-scrollbar-track { background: var(--px-bg); border: 2px solid var(--px-shadow); }
+.bracket::-webkit-scrollbar-thumb { background: var(--px-accent); border: 2px solid var(--px-shadow); }
+
+.round-label {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 8px !important;
+  letter-spacing: 2px !important;
+  color: var(--px-gold) !important;
+  text-align: center;
+  padding: 6px 8px;
+  background: rgba(255,190,0,0.06);
+  border: 2px solid var(--px-gold-d);
+  margin-bottom: 10px !important;
+}
+
+.match-tile {
+  background: var(--px-surface) !important;
+  border-radius: 0 !important;
+  border: 2px solid var(--px-shadow) !important;
+  border-left: 5px solid var(--px-accent2) !important;
+  padding: 10px !important;
+  box-shadow: 0 3px 0 var(--px-shadow) !important;
+  font-family: 'VT323', monospace !important;
+  font-size: 14px !important;
+}
+.match-tile.completed { border-left-color: var(--px-green) !important; }
+.match-tile.pending   { border-left-color: var(--px-text-dim) !important; opacity: 0.6 !important; }
+.match-tile.active    {
+  border-left-color: var(--px-gold) !important;
+  animation: matchPulse 1.4s ease-in-out infinite;
+}
+.match-tile.mine {
+  outline: 3px solid var(--px-accent) !important;
+  outline-offset: -3px;
+}
+@keyframes matchPulse {
+  0%,100% { box-shadow: 0 3px 0 var(--px-shadow); }
+  50%     { box-shadow: 0 3px 0 var(--px-shadow), 0 0 14px rgba(255,190,0,0.55); }
+}
+.match-side {
+  border-radius: 0 !important;
+  padding: 4px 6px !important;
+}
+.match-side.winner {
+  background: rgba(0,255,157,0.18) !important;
+  color: var(--px-green) !important;
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 8px !important;
+  letter-spacing: 0.5px !important;
+}
+.match-side.loser  { color: var(--px-text2) !important; text-decoration: line-through; }
+.match-vs   { font-family: 'Press Start 2P', monospace !important; font-size: 6px !important; color: var(--px-accent2) !important; padding: 2px 0 !important; }
+.match-meta { font-family: 'Press Start 2P', monospace !important; font-size: 6px !important; color: var(--px-text-dim) !important; }
+
+/* ── CTA banner: "your next match" lampeggio pixel ────────────────────── */
+.cta-banner {
+  border-radius: 0 !important;
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  letter-spacing: 2px !important;
+  background: var(--px-gold) !important;
+  color: var(--px-shadow) !important;
+  border: 3px solid var(--px-shadow) !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-gold-d),
+    inset  2px  2px 0 0 #fff080,
+    0 4px 0 var(--px-shadow) !important;
+  padding: 12px 18px !important;
+  animation: ctaBlink 0.9s steps(2, end) infinite !important;
+}
+@keyframes ctaBlink {
+  0%, 49%   { background: var(--px-gold); }
+  50%, 100% { background: var(--px-accent2); color: #fff; }
+}
+
+/* ── WINNER BANNER pixel champion ─────────────────────────────────────── */
+.winner-banner {
+  background: linear-gradient(180deg, rgba(255,190,0,0.18), rgba(0,255,157,0.10)) !important;
+  border: 3px solid var(--px-gold) !important;
+  border-radius: 0 !important;
+  box-shadow:
+    inset -2px -2px 0 0 var(--px-gold-d),
+    inset  2px  2px 0 0 #fff080,
+    0 5px 0 var(--px-shadow) !important;
+  padding: 18px !important;
+}
+.winner-banner .crown {
+  font-size: 42px !important;
+  filter: drop-shadow(2px 2px 0 var(--px-shadow));
+}
+.winner-banner .label {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 3px !important;
+  color: var(--px-gold) !important;
+}
+.winner-banner .name {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 14px !important;
+  color: #fff !important;
+  letter-spacing: 1px !important;
+  text-shadow: 2px 2px 0 var(--px-shadow), 0 0 16px var(--px-gold) !important;
+}
+
+/* Mobile lobby: bracket scrollabile orizzontale, tile compatti */
+@media (max-width: 640px) {
+  .tourn-title { font-size: 11px !important; }
+  .tourn-stats { font-size: 13px !important; }
+  .bracket-round { min-width: 180px !important; }
+  .match-tile { font-size: 12px !important; padding: 8px !important; }
+  .winner-banner .name { font-size: 11px !important; }
+  .winner-banner .crown { font-size: 32px !important; }
+  .cta-banner { font-size: 8px !important; letter-spacing: 1px !important; padding: 10px 12px !important; }
+  .players-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; gap: 8px !important; }
+}
 </style>
 </head>
 <body>

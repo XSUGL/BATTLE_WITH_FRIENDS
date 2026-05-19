@@ -176,24 +176,67 @@ const PIXEL_PALETTES = {
   brawler:{ 1:'#ffcc80', 2:'#a55a1c', 3:'#ffe6b3', 4:'#0a0e14', 5:'#f4c896', 6:'#d96a3a', 7:'#e23636', 8:'#ffffff' },
 };
 
+// ── ANIM FRAMES — sovrascritture delle 3 righe inferiori (le "gambe") per
+// ogni classe, per ogni stato. Il resto dello sprite (torso/testa) resta
+// uguale all'idle. Frame supportati: idle, walk_a, walk_b, jump.
+// Indice di riga: l'ultima riga è 15, la penultima 14, ecc.
+const ANIM_LEGS = {
+  knight: {
+    idle:   ['...11.11....', '...11.11....', '..222..222..'],
+    walk_a: ['...111.1....', '...11..1....', '..222...22..'],
+    walk_b: ['....1.111...', '....1..11...', '..22...222..'],
+    jump:   ['...11..11...', '..222..222..', '...22..22...'],
+  },
+  warrior: {
+    idle:   ['..222.222...', '..111.111...', '..222.222...'],
+    walk_a: ['.2221.11....', '.1111..1....', '.222...22...'],
+    walk_b: ['....11.1222.', '....1..1111.', '...22...222.'],
+    jump:   ['..111.111...', '.222...222..', '.222...222..'],
+  },
+  reaper: {
+    idle:   ['....1.1.....', '...22.22....', '..222.222...'],
+    walk_a: ['...11.1.....', '..221.1.....', '.222..22....'],
+    walk_b: ['.....1.11...', '.....1.122..', '....22..222.'],
+    jump:   ['....1.1.....', '...22.22....', '...22.22....'],
+  },
+  ranger: {
+    idle:   ['...11..11...', '...11..11...', '..222..222..'],
+    walk_a: ['...111.1....', '...11..1....', '..222...22..'],
+    walk_b: ['....1.111...', '....1..11...', '..22...222..'],
+    jump:   ['...11..11...', '...22..22...', '..222..222..'],
+  },
+  brawler: {
+    idle:   ['...11..11...', '...22..22...', '..222..222..'],
+    walk_a: ['..111..1....', '..222..2....', '.2222...22..'],
+    walk_b: ['....1..111..', '....2..222..', '..22...2222.'],
+    jump:   ['...11..11...', '..222..222..', '..222..222..'],
+  },
+};
+
 // Cache: pre-renderizza ogni sprite su un offscreen canvas così il drawImage
 // in render() è uno shot solo (zero loop nested per-frame).
 const SPRITE_CACHE = {};
 const SPRITE_PIXEL = 2; // ogni cella sprite = 2 logici (= 1 device px dopo PIXEL_SCALE)
-function buildSpriteCanvas(className){
+function buildSpriteCanvas(className, frame='idle'){
   const sprite  = PIXEL_SPRITES[className] || PIXEL_SPRITES.knight;
   const palette = PIXEL_PALETTES[className] || PIXEL_PALETTES.knight;
   const cols    = sprite[0].length;
   const rows    = sprite.length;
+  // Costruisci il set di righe per il frame richiesto: prendi le prime (rows-3)
+  // dallo sprite base, e sostituisci le ultime 3 dal pattern dell'animazione.
+  const legPatterns = ANIM_LEGS[className] || ANIM_LEGS.knight;
+  const legs = legPatterns[frame] || legPatterns.idle;
+  const finalRows = sprite.slice(0, rows - 3).concat(legs.slice(0, 3));
   const c = document.createElement('canvas');
   c.width  = cols * SPRITE_PIXEL;
   c.height = rows * SPRITE_PIXEL;
   const cx = c.getContext('2d');
   cx.imageSmoothingEnabled = false;
   for (let r = 0; r < rows; r++){
+    const rowStr = finalRows[r] || '';
     for (let col = 0; col < cols; col++){
-      const ch = sprite[r][col];
-      if (ch === '.' || ch === '0') continue;
+      const ch = rowStr[col];
+      if (!ch || ch === '.' || ch === '0') continue;
       const color = palette[ch];
       if (!color) continue;
       cx.fillStyle = color;
@@ -202,10 +245,24 @@ function buildSpriteCanvas(className){
   }
   return c;
 }
-function getSprite(className){
-  if (!SPRITE_CACHE[className]) SPRITE_CACHE[className] = buildSpriteCanvas(className);
-  return SPRITE_CACHE[className];
+function getSprite(className, frame='idle'){
+  const key = className + ':' + frame;
+  if (!SPRITE_CACHE[key]) SPRITE_CACHE[key] = buildSpriteCanvas(className, frame);
+  return SPRITE_CACHE[key];
 }
+
+// Calcola la scala visiva sprite in funzione del raggio.
+// Manteniamo SOLO multipli interi del SPRITE_PIXEL (no blur sub-pixel).
+// Formula: rispetta la dimensione originale dei personaggi (no giant mode).
+// radius=12 → scala 4 (sprite 48×64 logici). I personaggi più "grossi"
+// vengono solo dal power-up weapon_grow / size, non dalla scala base.
+function getSpriteScale(p){
+  return Math.max(2, Math.round((p.radius || 12) * 0.18) * 2); // 4,6,...
+}
+// Moltiplicatore base delle armi: indipendente dalla scala personaggio.
+// Le armi sono ~35% più grandi del default originale così riempiono
+// la mano del personaggio invece di sembrare "stuzzicadenti".
+const WEAPON_BASE_MULT = 1.35;
 
 const PU = {
   weapon_grow: { icon:'⚡', color:'#ffbe00', label:'+SIZE'  },
@@ -1121,27 +1178,52 @@ function drawPlayer(p){
   }
 
   // ── PIXEL SPRITE BODY ────────────────────────────────────────────────
-  // Sprite procedurale per classe. Aura/shadow/flash applicati allo sprite,
-  // non più al pallino gradiente. Lo sprite cached è 24×32 pixel (logici).
+  // Sprite procedurale per classe + animazioni (walk a/b, jump, idle).
+  // Lo sprite è scelto in base allo stato di movimento del player (vx, vy,
+  // onGround dal server). Bob verticale + squash/stretch danno feel "punchy".
   const className = (p.className || p.name || 'knight').toLowerCase();
-  const sprite = getSprite(className);
-  // Dimensione visiva sprite proporzionale al raggio del player. Manteniamo
-  // multipli interi del SPRITE_PIXEL per evitare blur sub-pixel.
-  const spriteScale = Math.max(2, Math.round(p.radius * 0.16) * 2); // 2,4,6,...
+
+  // ── ANIMAZIONE: scelta del frame ────────────────────────────────────
+  const moving = Math.abs(p.vx) > FACING_THRESHOLD;
+  const inAir  = (p.onGround === false) || Math.abs(p.vy) > 1.5;
+  let frame = 'idle';
+  let bobY = 0;            // offset verticale "hop" durante la camminata
+  let sxScale = 1, syScale = 1; // squash/stretch su salto
+
+  if (inAir){
+    frame = 'jump';
+    // Salto: stretch in salita, squash in atterraggio
+    if (p.vy < -0.5) { sxScale = 0.92; syScale = 1.10; }
+    else if (p.vy > 0.5) { sxScale = 1.06; syScale = 0.94; }
+  } else if (moving){
+    // Walk-cycle: alterna due frame ~7Hz, con micro-hop
+    const phase = Math.floor(t * 7) % 2;
+    frame = phase ? 'walk_b' : 'walk_a';
+    bobY = phase ? -1 : 0;
+  }
+
+  const sprite = getSprite(className, frame);
+  const spriteScale = getSpriteScale(p);
   const sw = sprite.width  * spriteScale / SPRITE_PIXEL;
   const sh = sprite.height * spriteScale / SPRITE_PIXEL;
+
   // Flip orizzontale in base alla direzione di MOVIMENTO reale (vx del server).
-  // Se vx > soglia → guarda a destra; se vx < -soglia → guarda a sinistra.
-  // Se ~0 (fermo o solo verticale) → mantieni l'ultimo facing.
   if (p.vx > FACING_THRESHOLD)       playerFacing[p.num] = 1;
   else if (p.vx < -FACING_THRESHOLD) playerFacing[p.num] = -1;
   const facing = playerFacing[p.num] || 1;
-  const sx = p.x - sw/2;
-  const sy = p.y - sh/2 - 2;
 
-  // shadow ai piedi (ellisse pixel)
+  // Applico squash/stretch alle dimensioni finali (mantenendo i piedi a terra)
+  const drawW = sw * sxScale;
+  const drawH = sh * syScale;
+  const sx = p.x - drawW / 2;
+  // "ancoraggio piedi": sposto sy in modo che la base resti sul pavimento
+  // anche con syScale variabile. Aggiungo bobY per il piccolo hop walk.
+  const footY = p.y + sh / 2 - 2;
+  const sy = footY - drawH + bobY;
+
+  // shadow ai piedi (ellisse pixel) — leggermente più larga sui personaggi grossi
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.fillRect(p.x - p.radius*0.7, p.y + sh*0.42, p.radius*1.4, 4);
+  ctx.fillRect(p.x - p.radius*0.85, footY - 1, p.radius*1.7, 4);
 
   // glow / hit flash via shadowBlur sul drawImage
   ctx.shadowColor = isFlash ? '#fff' : (hasDmg ? '#ff3333' : p.color);
@@ -1150,9 +1232,9 @@ function drawPlayer(p){
   if (facing === -1){
     ctx.translate(p.x, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(sprite, -sw/2, sy, sw, sh);
+    ctx.drawImage(sprite, -drawW/2, sy, drawW, drawH);
   } else {
-    ctx.drawImage(sprite, sx, sy, sw, sh);
+    ctx.drawImage(sprite, sx, sy, drawW, drawH);
   }
   ctx.restore();
   ctx.shadowBlur = 0;
@@ -1162,30 +1244,43 @@ function drawPlayer(p){
     ctx.globalAlpha = 0.55;
     ctx.globalCompositeOperation = 'source-atop';
     ctx.fillStyle = '#ff4444';
-    ctx.fillRect(sx, sy, sw, sh);
+    ctx.fillRect(sx, sy, drawW, drawH);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
   }
 
-  drawWeapons(p,effs);
+  // Polvere ai piedi quando cammina a terra (pixel particles)
+  if (moving && !inAir){
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = 'rgba(180,170,150,0.7)';
+    const dustX = p.x - facing * (p.radius*0.4 + Math.random()*4);
+    ctx.fillRect(dustX | 0, (footY + Math.random()*2) | 0, 3, 2);
+    ctx.globalAlpha = 1;
+  }
+
+  drawWeapons(p, effs, spriteScale);
   ctx.globalAlpha=1; ctx.shadowBlur=0;
 }
 
-function drawWeapons(p,effs){
-  const grow = effs?.weapon_grow>0;
-  const sm   = grow ? 1.85 : 1;
-  
+function drawWeapons(p, effs, spriteScale){
+  const grow = effs?.weapon_grow > 0;
+  // Le armi hanno un moltiplicatore base costante (WEAPON_BASE_MULT = 1.35),
+  // ovvero il 35% più grandi del default originale — così riempiono la mano
+  // del personaggio. Personaggi NON ingranditi (la base resta originale).
+  // weapon_grow buff applica un ulteriore 1.85×.
+  const sm = (grow ? 1.85 : 1) * WEAPON_BASE_MULT;
+
   for(const w of p.weapons){
     const ox=p.x+Math.cos(w.currentAngle)*w.orbitRadius;
     const oy=p.y+Math.sin(w.currentAngle)*w.orbitRadius;
     ctx.save();
     ctx.translate(ox,oy);
     ctx.rotate(w.currentAngle+Math.PI/2);
-    
+
     const gc=grow?'#ffbe00':p.color;
-    ctx.shadowColor=gc; 
+    ctx.shadowColor=gc;
     ctx.shadowBlur=grow?24:10;
-    
+
     // Proportions optimized per weapon type (relative to player radius ~12)
     const proportions = {
       sword:  { w: 18, h: 60, ox: 0, oy: 0 },
@@ -1194,25 +1289,29 @@ function drawWeapons(p,effs){
       spear:  { w: 20, h: 70, ox: 0, oy: -2 },
       fist:   { w: 28, h: 32, ox: 0, oy: 0 }
     };
-    
+
     const props = proportions[w.type] || { w: 20, h: 50, ox: 0, oy: 0 };
     const weaponW = props.w * sm;
     const weaponH = props.h * sm;
-    
+    // Anche gli offset della "mano" scalano con sm così l'arma resta agganciata
+    // al pugno del personaggio quando il personaggio cresce.
+    const ox2 = props.ox * sm;
+    const oy2 = props.oy * sm;
+
     // Try to draw weapon image, fall back to shapes if not loaded
     const img = weaponImages[w.type];
     if(img && img.complete){
       try {
-        ctx.drawImage(img, props.ox - weaponW/2, props.oy - weaponH/2, weaponW, weaponH);
+        ctx.drawImage(img, ox2 - weaponW/2, oy2 - weaponH/2, weaponW, weaponH);
       } catch(e) {
         // Fallback if image fails
-        ctx.fillStyle=gc; 
-        ctx.fillRect(props.ox - weaponW/2, props.oy - weaponH/2, weaponW, weaponH);
+        ctx.fillStyle=gc;
+        ctx.fillRect(ox2 - weaponW/2, oy2 - weaponH/2, weaponW, weaponH);
       }
     } else {
       // Fallback to old canvas drawing while images load
-      ctx.fillStyle=gc; 
-      ctx.fillRect(props.ox - weaponW/2, props.oy - weaponH/2, weaponW, weaponH);
+      ctx.fillStyle=gc;
+      ctx.fillRect(ox2 - weaponW/2, oy2 - weaponH/2, weaponW, weaponH);
     }
     
     ctx.shadowBlur=0; 
