@@ -3,6 +3,7 @@ import pool from '../utils/db.js';
 import { updateMatchStatus, completeMatch, findMatchById } from '../models/match-model.js';
 import { saveMatchResults } from '../models/score-model.js';
 import { advanceTournamentAfterMatch } from '../models/tournament-model.js';
+import { findById as findUserById } from '../models/user-model.js';
 
 export class GameRoom {
   constructor(matchId, onCleanup = null) {
@@ -121,13 +122,25 @@ export class GameRoom {
     this.prepareGame();
   }
 
-  prepareGame() {
+  async prepareGame() {
     this.status = 'ready_to_start';
     this.gameState = new GameState(this.class1, this.class2, this.mapId);
+    // Carica gli username reali dei due player così il client può mostrarli
+    // sopra ai personaggi nel canvas (etichetta flottante)
+    let usernames = { p1: 'Player 1', p2: 'Player 2' };
+    try {
+      const [u1, u2] = await Promise.all([
+        this.player1?.userId ? findUserById(this.player1.userId) : null,
+        this.player2?.userId ? findUserById(this.player2.userId) : null
+      ]);
+      if (u1?.username) usernames.p1 = u1.username;
+      if (u2?.username) usernames.p2 = u2.username;
+    } catch (e) { console.warn('username lookup failed:', e?.message); }
     this.broadcast({
       type: 'game_start',
       initialState: this.gameState.toJSON(),
       classes: { p1: this.class1, p2: this.class2 },
+      usernames,
       mapId: this.mapId
     });
     setTimeout(() => {

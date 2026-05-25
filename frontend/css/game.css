@@ -81,21 +81,54 @@ body{
 
 .fighter-name{
   font-family:'Orbitron',monospace;
-  font-size:10px;font-weight:700;letter-spacing:2px;color:#fff;
+  font-size:11px;font-weight:900;letter-spacing:2px;color:#fff;
+  text-transform:uppercase;
+}
+.p1-hud .fighter-name{text-shadow:0 0 8px rgba(0,212,255,.7)}
+.p2-hud .fighter-name{text-shadow:0 0 8px rgba(255,61,92,.7)}
+
+/* Badge "YOU" che evidenzia il blocco HUD del player locale */
+.fighter-hud.is-you{
+  position:relative;
+  background:linear-gradient(90deg,rgba(255,190,0,.08),transparent 60%);
+  border-radius:10px;
+  padding:6px 10px;margin:-6px -10px;
+}
+.p2-hud.is-you{background:linear-gradient(270deg,rgba(255,190,0,.08),transparent 60%)}
+.fighter-hud.is-you::before{
+  content:'YOU';position:absolute;
+  top:-6px;left:50%;transform:translateX(-50%);
+  font-family:'Orbitron',monospace;font-size:8px;font-weight:900;letter-spacing:2px;
+  color:#0a0e14;background:var(--gold);
+  padding:2px 7px;border-radius:3px;
+  box-shadow:0 0 12px rgba(255,190,0,.6);
+  animation:youPulse 1.4s ease-in-out infinite;
+  z-index:2;
+}
+@keyframes youPulse{
+  0%,100%{box-shadow:0 0 10px rgba(255,190,0,.5)}
+  50%{box-shadow:0 0 22px rgba(255,190,0,.9)}
 }
 
 .hp-bar-wrap{
-  width:100%;max-width:185px;height:6px;
+  width:100%;max-width:200px;height:10px;
   background:rgba(255,255,255,.05);
-  border-radius:3px;overflow:hidden;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
+  border-radius:4px;overflow:hidden;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.5);
+  border:1px solid rgba(255,255,255,.08);
 }
 
-.hp-bar{height:100%;border-radius:3px;transition:width .12s ease;width:100%}
-.p1-hp-bar{background:linear-gradient(90deg,var(--p1),#00aacc);box-shadow:0 0 8px rgba(0,212,255,.4)}
-.p2-hp-bar{background:linear-gradient(90deg,#bb1a30,var(--p2));box-shadow:0 0 8px rgba(255,61,92,.4)}
+.hp-bar{height:100%;border-radius:3px;transition:width .12s ease;width:100%;position:relative}
+.hp-bar::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.25),transparent 40%,transparent 60%,rgba(0,0,0,.2));
+}
+.p1-hp-bar{background:linear-gradient(90deg,var(--p1),#0099bb);box-shadow:0 0 10px rgba(0,212,255,.5)}
+.p2-hp-bar{background:linear-gradient(90deg,#aa1a30,var(--p2));box-shadow:0 0 10px rgba(255,61,92,.5)}
 
-.hp-text{font-size:9px;color:var(--text2);font-family:'Orbitron',monospace;letter-spacing:1px}
+.hp-text{font-size:11px;color:#fff;font-family:'Orbitron',monospace;letter-spacing:1px;font-weight:700;opacity:.85}
+.p1-hud .hp-text{color:var(--p1)}
+.p2-hud .hp-text{color:var(--p2)}
 
 /* effect pills */
 .effects-bar{display:flex;gap:5px;min-height:16px;flex-wrap:wrap}

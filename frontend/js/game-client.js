@@ -12,6 +12,9 @@ let ws, playerNumber, gameState = null;
 let currentMapId = 'arena';
 let savedMapGeo  = { platforms:[], obstacles:[], hasGround:true, groundY:460 };
 let gameOver = false;
+// Username dei due player (caricati dal server al game_start) — usati per
+// disegnare l'etichetta sopra al personaggio nel canvas
+let usernames = { p1: '', p2: '' };
 // Timer ID per cleanup
 let renderIntervalId = null;
 let inputIntervalId = null;
@@ -456,10 +459,15 @@ function connect(){
         currentMapId = msg.mapId || 'arena';
         // Salva geometria mappa — non viene persa nei state_update
         if(gameState.map) savedMapGeo = gameState.map;
+        // Username reali per le etichette flottanti sul canvas
+        if (msg.usernames) usernames = msg.usernames;
         p1emoji.textContent = gameState.player1.emoji;
-        p1name.textContent  = gameState.player1.name.toUpperCase();
+        p1name.textContent  = `${gameState.player1.name.toUpperCase()}${playerNumber===1?' · YOU':''}`;
         p2emoji.textContent = gameState.player2.emoji;
-        p2name.textContent  = gameState.player2.name.toUpperCase();
+        p2name.textContent  = `${gameState.player2.name.toUpperCase()}${playerNumber===2?' · YOU':''}`;
+        // Marca il blocco HUD del player locale per styling speciale (riquadro YOU)
+        document.querySelector('.p1-hud')?.classList.toggle('is-you', playerNumber===1);
+        document.querySelector('.p2-hud')?.classList.toggle('is-you', playerNumber===2);
         initStars(canvas.logicalW, canvas.logicalH);
         initMapDecor(currentMapId, canvas.logicalW, canvas.logicalH);
         loadWeaponImages();
@@ -604,10 +612,150 @@ function render(){
   }
   ctx.globalAlpha = 1;
 
+  // ── Anelli di squadra a terra (sotto ai giocatori, sopra le piattaforme)
+  // Disegnati PRIMA dei player così non coprono i piedi ma si vedono sotto.
+  drawTeamRing(gameState.player2);
+  drawTeamRing(gameState.player1);
+
   // ── Players ──
   drawPlayer(gameState.player2);
   drawPlayer(gameState.player1);
+
+  // ── Etichette flottanti (nickname + HP bar + freccia YOU) SOPRA tutto ──
+  drawPlayerLabel(gameState.player2);
+  drawPlayerLabel(gameState.player1);
+
   ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+}
+
+// ─── TEAM RING — anello colorato a terra per identificare P1/P2 ──────────
+// Cyan per P1, rosso per P2. Disegnato come ellisse "pixel" leggermente
+// pulsante. Aiuta a distinguere i due fighter anche se hanno la stessa classe.
+function drawTeamRing(p){
+  if (!p || p.dead) return;
+  const t = Date.now() / 1000;
+  const isMe = p.num === playerNumber;
+  // Colore team (non quello della classe, che è generico)
+  const teamColor = p.num === 1 ? '#00d4ff' : '#ff3d5c';
+  const footY = p.y + (p.radius || 12);
+  // Pulse: leggero scaling sull'anello, più marcato per il proprio player
+  const pulse = isMe ? (1 + 0.10 * Math.sin(t * 4)) : (1 + 0.04 * Math.sin(t * 2.5));
+  const rx = (p.radius || 12) * 1.25 * pulse;
+  const ry = rx * 0.35;
+  // Anello esterno (alone)
+  ctx.save();
+  ctx.globalAlpha = isMe ? 0.55 : 0.40;
+  ctx.strokeStyle = teamColor;
+  ctx.lineWidth = isMe ? 3 : 2;
+  ctx.beginPath();
+  ctx.ellipse(p.x, footY + 1, rx, ry, 0, 0, Math.PI*2);
+  ctx.stroke();
+  // Riempimento interno semi-trasparente
+  ctx.globalAlpha = isMe ? 0.18 : 0.10;
+  ctx.fillStyle = teamColor;
+  ctx.beginPath();
+  ctx.ellipse(p.x, footY + 1, rx*0.85, ry*0.85, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ─── PLAYER LABEL — nickname + HP bar + freccia YOU sopra la testa ───────
+// Stile pixel-art coerente col resto del gioco. Coordinate canvas logiche
+// (800x500). La testa del player è approssimativamente a footY - drawH.
+function drawPlayerLabel(p){
+  if (!p || p.dead) return;
+  const isMe = p.num === playerNumber;
+  const teamColor = p.num === 1 ? '#00d4ff' : '#ff3d5c';
+  const teamColorDark = p.num === 1 ? '#0080a0' : '#a01830';
+  // Username (fallback al nome classe se non disponibile)
+  const label = (p.num === 1 ? usernames.p1 : usernames.p2) || (p.name || `P${p.num}`);
+  const displayName = String(label).toUpperCase().slice(0, 14);
+
+  // Posizione: stessa logica dello sprite (footY - drawH)
+  const spriteScale = getSpriteScale(p);
+  const drawH = 16 * spriteScale;
+  const footY = p.y + (p.radius || 12);
+  const headY = footY - drawH;
+  // Y dell'etichetta: 16px sopra la testa (canvas logico = 800x500)
+  const labelY = headY - 18;
+  const cx = Math.round(p.x);
+
+  // Carattere monospaziato chunky
+  ctx.save();
+  ctx.font = 'bold 11px Orbitron, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const nameW = Math.max(48, Math.ceil(ctx.measureText(displayName).width) + 10);
+  const nameH = 13;
+  const nameX = cx - nameW / 2;
+  const nameY = labelY - nameH / 2;
+
+  // BG pixel-card del nome (bordo team-colored)
+  ctx.fillStyle = 'rgba(4,8,15,0.85)';
+  ctx.fillRect(nameX, nameY, nameW, nameH);
+  ctx.strokeStyle = teamColor;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(nameX + 0.5, nameY + 0.5, nameW - 1, nameH - 1);
+  // Bordo angolare (chunky pixel corners)
+  ctx.fillStyle = teamColor;
+  ctx.fillRect(nameX, nameY, 2, 2);
+  ctx.fillRect(nameX + nameW - 2, nameY, 2, 2);
+  ctx.fillRect(nameX, nameY + nameH - 2, 2, 2);
+  ctx.fillRect(nameX + nameW - 2, nameY + nameH - 2, 2, 2);
+
+  // Testo nome
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = teamColor;
+  ctx.shadowBlur = isMe ? 8 : 4;
+  ctx.fillText(displayName, cx, labelY + 0.5);
+  ctx.shadowBlur = 0;
+
+  // ── HP bar pixel sotto al nome ─────────────────────────────────────────
+  const hpBarW = nameW;
+  const hpBarH = 4;
+  const hpBarX = nameX;
+  const hpBarY = nameY + nameH + 2;
+  const hpRatio = Math.max(0, Math.min(1, (p.hp || 0) / (p.maxHp || 1)));
+  // Sfondo (vuoto)
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(hpBarX, hpBarY, hpBarW, hpBarH);
+  // Riempimento HP (colore team)
+  if (hpRatio > 0) {
+    // Gradiente discreto: verde alto / giallo medio / rosso basso
+    let fillColor = teamColor;
+    if (hpRatio < 0.3) fillColor = '#ff3d5c';
+    else if (hpRatio < 0.6) fillColor = '#ffbe00';
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(hpBarX + 1, hpBarY + 1, Math.round((hpBarW - 2) * hpRatio), hpBarH - 2);
+  }
+  // Bordo HP bar
+  ctx.strokeStyle = teamColorDark;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(hpBarX + 0.5, hpBarY + 0.5, hpBarW - 1, hpBarH - 1);
+
+  // ── Freccia "YOU" dorata pulsante sopra al nome ─────────────────────────
+  if (isMe) {
+    const t = Date.now() / 1000;
+    const bob = Math.round(Math.sin(t * 4) * 2);
+    const arrowY = nameY - 14 + bob;
+    const ax = cx;
+    // Triangolo discendente (pixel chunky)
+    ctx.fillStyle = '#ffbe00';
+    ctx.shadowColor = '#ffbe00';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.moveTo(ax - 6, arrowY);
+    ctx.lineTo(ax + 6, arrowY);
+    ctx.lineTo(ax, arrowY + 6);
+    ctx.closePath();
+    ctx.fill();
+    // Pixel highlight bianco sulla punta
+    ctx.fillStyle = '#fffac0';
+    ctx.fillRect(ax - 1, arrowY + 1, 2, 2);
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
 }
 
 // ─── OBSTACLE (pixel-art con dithering) ───
